@@ -1,7 +1,0 @@
-test.obj
-
-lib\msvcrt.lib
-lib\kernel32.lib
-lib\ntdll.lib
-
-
