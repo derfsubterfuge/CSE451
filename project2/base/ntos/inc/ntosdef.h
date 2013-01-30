@@ -667,8 +667,6 @@ typedef struct _KERNEL_STACK_SEGMENT {
 // Global definition for CSE451 Project 1 data.
 //
 
-extern SYSTEM_CSE451_INFORMATION Cse451Info;
-extern HIST_LIST ChunkedHistory;
 extern 
 VOID
 incStatus(
