@@ -21,10 +21,7 @@ Abstract:
 #pragma alloc_text(PAGE, NtWriteFile)
 #pragma alloc_text(PAGE, NtWriteFileGather)
 
-#define INC_STATUS_WRITEFILE(status); incStatus(&Cse451Info, WriteFile, status); \
-	if(NT_SUCCESS(status)) { \
-		Cse451Info.ApiStatus[WriteFile].BytesUsed += Length; \
-	}
+#define INC_STATUS_WRITEFILE(status); incStatus(WriteFile, status, Length);
 NTSTATUS
 NtWriteFile (
     __in HANDLE FileHandle,
@@ -107,6 +104,7 @@ Return Value:
     PULONG majorFunction;
     PETHREAD CurrentThread;
 
+	addHistCall(WriteFile);
     PAGED_CODE();
 
     //

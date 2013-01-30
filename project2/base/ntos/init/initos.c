@@ -237,7 +237,7 @@ PFN_COUNT BBTPagesToReserve;
 #pragma data_seg()
 #endif
 
-
+
 VOID
 ExpInitializeExecutive(
     IN ULONG Number,
@@ -283,6 +283,7 @@ Return Value:
     BOOLEAN BufferSizeOk;
     ULONG ImageCount;
     ULONG i;
+	ULONG j;
     ULONG_PTR ResourceIdPath[3];
     PIMAGE_RESOURCE_DATA_ENTRY ResourceDataEntry;
     PMESSAGE_RESOURCE_DATA  MessageData;
@@ -583,6 +584,11 @@ Return Value:
             KeBugCheck(PHASE0_INITIALIZATION_FAILED);
         }
 
+		//
+        // Initialize cse451 mutexes
+        //
+		ExInitializeFastMutex(&Cse451Mutex);
+		
         //
         // Scan the loaded module list and load the driver image symbols.
         //

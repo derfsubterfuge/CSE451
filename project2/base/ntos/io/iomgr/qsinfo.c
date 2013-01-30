@@ -140,6 +140,7 @@ Return Value:
     BOOLEAN skipDriver;
     PETHREAD CurrentThread;
 
+	addHistCall(QueryInformationFile);
     PAGED_CODE();
 
     //
@@ -159,7 +160,7 @@ Return Value:
         if ((ULONG) FileInformationClass >= FileMaximumInformation ||
             !IopQueryOperationLength[FileInformationClass]) {
 			status = STATUS_INVALID_INFO_CLASS;
-			incStatus(&Cse451Info, QueryInformationFile, status);
+			incStatus(QueryInformationFile, status, 0);
             return status;
         }
 
@@ -171,7 +172,7 @@ Return Value:
 
         if (Length < (ULONG) IopQueryOperationLength[FileInformationClass]) {
 			status = STATUS_INFO_LENGTH_MISMATCH;
-			incStatus(&Cse451Info, QueryInformationFile, status);
+			incStatus(QueryInformationFile, status, 0);
             return status;
         }
 
@@ -225,7 +226,7 @@ Return Value:
             //
 
 			status = GetExceptionCode();
-			incStatus(&Cse451Info, QueryInformationFile, status);
+			incStatus(QueryInformationFile, status, 0);
             return status;
         }
 
@@ -241,13 +242,13 @@ Return Value:
         if ((ULONG) FileInformationClass >= FileMaximumInformation ||
             !IopQueryOperationLength[FileInformationClass]) {
 			status = STATUS_INVALID_INFO_CLASS;
-			incStatus(&Cse451Info, QueryInformationFile, status);
+			incStatus(QueryInformationFile, status, 0);
             return status;
         }
 
         if (Length < (ULONG) IopQueryOperationLength[FileInformationClass]) {
 			status = STATUS_INFO_LENGTH_MISMATCH;
-			incStatus(&Cse451Info, QueryInformationFile, status);
+			incStatus(QueryInformationFile, status, 0);
             return status;
         }
 
@@ -270,7 +271,7 @@ Return Value:
                                         &handleInformation);
 
     if (!NT_SUCCESS( status )) {
-		incStatus(&Cse451Info, QueryInformationFile, status);
+		incStatus(QueryInformationFile, status, 0);
         return status;
     }
 
@@ -306,7 +307,7 @@ Return Value:
                                                &interrupted );
             if (interrupted) {
                 ObDereferenceObject( fileObject );
-				incStatus(&Cse451Info, QueryInformationFile, status);
+				incStatus(QueryInformationFile, status, 0);
                 return status;
             }
         }
@@ -373,7 +374,7 @@ Return Value:
 
             IopReleaseFileObjectLock( fileObject );
             ObDereferenceObject( fileObject );
-			incStatus(&Cse451Info, QueryInformationFile, status);
+			incStatus(QueryInformationFile, status, 0);
             return status;
 
         //
@@ -452,7 +453,7 @@ Return Value:
 
                 IopReleaseFileObjectLock( fileObject );
                 ObDereferenceObject( fileObject );
-				incStatus(&Cse451Info, QueryInformationFile, status);
+				incStatus(QueryInformationFile, status, 0);
                 return status;
             }
         }
@@ -470,7 +471,7 @@ Return Value:
         if (event == NULL) {
             ObDereferenceObject( fileObject );
 			status = STATUS_INSUFFICIENT_RESOURCES;
-			incStatus(&Cse451Info, QueryInformationFile, status);
+			incStatus(QueryInformationFile, status, 0);
             return status;
         }
         KeInitializeEvent( event, SynchronizationEvent, FALSE );
@@ -504,7 +505,7 @@ Return Value:
         IopAllocateIrpCleanup( fileObject, (PKEVENT) NULL );
 		
 		status = STATUS_INSUFFICIENT_RESOURCES;
-		incStatus(&Cse451Info, QueryInformationFile, status);
+		incStatus(QueryInformationFile, status, 0);
         return status;
     }
     irp->Tail.Overlay.OriginalFileObject = fileObject;
@@ -567,7 +568,7 @@ Return Value:
                              (PKEVENT) NULL,
                              event );
 		status = GetExceptionCode();
-		incStatus(&Cse451Info, QueryInformationFile, status);
+		incStatus(QueryInformationFile, status, 0);
         return status;
     }
 
@@ -846,7 +847,7 @@ Return Value:
             IopReleaseFileObjectLock( fileObject );
         }
     }
-	incStatus(&Cse451Info, QueryInformationFile, status);
+	incStatus(QueryInformationFile, status, 0);
     return status;
 }
 
@@ -901,6 +902,7 @@ Return Value:
     BOOLEAN synchronousIo;
     PETHREAD CurrentThread;
 
+	addHistCall(SetInformationFile);
     PAGED_CODE();
 
     //
@@ -920,7 +922,7 @@ Return Value:
         if ((ULONG) FileInformationClass >= FileMaximumInformation ||
             !IopSetOperationLength[FileInformationClass]) {
 			status = STATUS_INVALID_INFO_CLASS;
-			incStatus(&Cse451Info, SetInformationFile, status);
+			incStatus(SetInformationFile, status, 0);
             return status;
         }
 
@@ -932,7 +934,7 @@ Return Value:
 
         if (Length < (ULONG) IopSetOperationLength[FileInformationClass]) {
 			status = STATUS_INFO_LENGTH_MISMATCH;
-			incStatus(&Cse451Info, SetInformationFile, status);
+			incStatus(SetInformationFile, status, 0);
             return status;
         }
 
@@ -985,7 +987,7 @@ Return Value:
             // Simply return an appropriate error status code.
             //
 			status = GetExceptionCode();
-			incStatus(&Cse451Info, SetInformationFile, status);
+			incStatus(SetInformationFile, status, 0);
             return status;
 
         }
@@ -1002,13 +1004,13 @@ Return Value:
         if ((ULONG) FileInformationClass >= FileMaximumInformation ||
             !IopSetOperationLength[FileInformationClass]) {
 			status = STATUS_INVALID_INFO_CLASS;
-			incStatus(&Cse451Info, SetInformationFile, status);
+			incStatus(SetInformationFile, status, 0);
             return status;
         }
 
         if (Length < (ULONG) IopSetOperationLength[FileInformationClass]) {
 			status = STATUS_INFO_LENGTH_MISMATCH;
-			incStatus(&Cse451Info, SetInformationFile, status);
+			incStatus(SetInformationFile, status, 0);
             return status;
         }
 
@@ -1030,7 +1032,7 @@ Return Value:
                                         (PVOID *) &fileObject,
                                         NULL );
     if (!NT_SUCCESS( status )) {
-		incStatus(&Cse451Info, SetInformationFile, status);
+		incStatus(SetInformationFile, status, 0);
         return status;
     }
 
@@ -1064,7 +1066,7 @@ Return Value:
                                                &interrupted );
             if (interrupted) {
                 ObDereferenceObject( fileObject );
-				incStatus(&Cse451Info, SetInformationFile, status);
+				incStatus(SetInformationFile, status, 0);
                 return status;
             }
         }
@@ -1104,7 +1106,7 @@ Return Value:
                 IopReleaseFileObjectLock( fileObject );
                 ObDereferenceObject( fileObject );
 				status = GetExceptionCode();
-				incStatus(&Cse451Info, SetInformationFile, status);
+				incStatus(SetInformationFile, status, 0);
                 return status;
             }
 
@@ -1162,7 +1164,7 @@ Return Value:
 
             IopReleaseFileObjectLock( fileObject );
             ObDereferenceObject( fileObject );
-			incStatus(&Cse451Info, SetInformationFile, status);
+			incStatus(SetInformationFile, status, 0);
             return status;
         }
         synchronousIo = TRUE;
@@ -1179,7 +1181,7 @@ Return Value:
         if (event == NULL) {
             ObDereferenceObject( fileObject );
 			status = STATUS_INSUFFICIENT_RESOURCES;
-			incStatus(&Cse451Info, SetInformationFile, status);
+			incStatus(SetInformationFile, status, 0);
             return status;
         }
         KeInitializeEvent( event, SynchronizationEvent, FALSE );
@@ -1218,7 +1220,7 @@ Return Value:
             ExFreePool( event );
         }
         ObDereferenceObject( fileObject );
-		incStatus(&Cse451Info, SetInformationFile, status);
+		incStatus(SetInformationFile, status, 0);
         return status;
     }
 
@@ -1241,7 +1243,7 @@ Return Value:
 
         IopAllocateIrpCleanup( fileObject, (PKEVENT) NULL );
 		status = STATUS_INSUFFICIENT_RESOURCES;
-		incStatus(&Cse451Info, SetInformationFile, status);
+		incStatus(SetInformationFile, status, 0);
         return status;
     }
     irp->Tail.Overlay.OriginalFileObject = fileObject;
@@ -1323,7 +1325,7 @@ Return Value:
                              (PKEVENT) NULL,
                              event );
 		status = GetExceptionCode();
-		incStatus(&Cse451Info, SetInformationFile, status);
+		incStatus(SetInformationFile, status, 0);
         return status;
 
     }
@@ -1798,7 +1800,7 @@ Return Value:
     if (targetHandle) {
         ObCloseHandle( targetHandle, KernelMode );
     }
-	incStatus(&Cse451Info, SetInformationFile, status);
+	incStatus(SetInformationFile, status, 0);
     return status;
 }
 

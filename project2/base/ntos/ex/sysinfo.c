@@ -53,15 +53,133 @@ ExpUpdateComPlusPackage (
 	Represents all of the status information that we are keeping track of for
 	all of the CSE451_APIS.  This initializes all of the counts and BytesUsed to 0.
 */
-SYSTEM_CSE451_INFORMATION Cse451Info = {{
-	{0, 0, {{0, 0}, {0, 0}, {0, 0}, {0, 0}, {0, 0}, {0, 0}, {0, 0}, {0, 0}}},
-	{0, 0, {{0, 0}, {0, 0}, {0, 0}, {0, 0}, {0, 0}, {0, 0}, {0, 0}, {0, 0}}},
-	{0, 0, {{0, 0}, {0, 0}, {0, 0}, {0, 0}, {0, 0}, {0, 0}, {0, 0}, {0, 0}}},
-	{0, 0, {{0, 0}, {0, 0}, {0, 0}, {0, 0}, {0, 0}, {0, 0}, {0, 0}, {0, 0}}},
-	{0, 0, {{0, 0}, {0, 0}, {0, 0}, {0, 0}, {0, 0}, {0, 0}, {0, 0}, {0, 0}}},
-	{0, 0, {{0, 0}, {0, 0}, {0, 0}, {0, 0}, {0, 0}, {0, 0}, {0, 0}, {0, 0}}},
-	{0, 0, {{0, 0}, {0, 0}, {0, 0}, {0, 0}, {0, 0}, {0, 0}, {0, 0}, {0, 0}}}
-}};
+SYSTEM_CSE451_INFORMATION Cse451Info = InitializeCse451Info();
+
+/*
+	History divided into chunks 
+*/
+HIST_LIST ChunkedHistory = {0, {0}};
+
+//Mutex used when incrementing a status in Cse451Info, or adding an event to history
+FAST_MUTEX Cse451Mutex;
+
+/*
+	called by both incStatus and addHistCall
+	
+	adds a function (i.e. NtOpenFile, NtCreateFile, etc.), an action (i.e. Call, Return, etc.), the Status (whole status code), and the time (in 100ms) to the history.  If there isn't enough room in the history buffer to add the call, it overwrites the last entry with a BufferOverflow event.  If the last entry in the last buffer is a BufferOverflow when the last BufferOverflow occurs, it keeps the old timestamp.
+*/
+VOID
+addToHistory(
+	CSE451_APIS Function,
+	CSE451_ACTIONS Action,
+	NTSTATUS Status
+	)
+{
+	
+	PHIST_LIST_BLOCK curNode;
+	HIST_EVENT newEvent;
+	
+	//find the current block that we are on
+	if(ChunkedHistory.Size == 0) {
+		ChunkedHistory.Size = 1;
+		ChunkedHistory.HistoryBlocks[0] = (PHIST_LIST_BLOCK) ExAllocatePool(PagedPool, HISTORY_BLOCK_SIZE);
+		curNode = ChunkedHistory.HistoryBlocks[0];
+		curNode->Size = 0;
+	} else {
+		curNode = ChunkedHistory.HistoryBlocks[ChunkedHistory.Size-1];
+	}
+	
+	if(ChunkedHistory.Size < NUM_HISTORY_BLOCKS
+		|| (ChunkedHistory.Size == NUM_HISTORY_BLOCKS && curNode->Size < NUM_EVENTS_PER_HIST_BLOCK)
+		)
+	{ 
+		//if we don't have enough room in this block
+		//create a new block
+		if(curNode->Size >= NUM_EVENTS_PER_HIST_BLOCK) {
+			ChunkedHistory.HistoryBlocks[ChunkedHistory.Size] = (PHIST_LIST_BLOCK) ExAllocatePool(PagedPool, HISTORY_BLOCK_SIZE);
+			curNode = ChunkedHistory.HistoryBlocks[ChunkedHistory.Size];
+			ChunkedHistory.Size++;
+			curNode->Size = 0;
+		}
+	
+		//then put in the new history event to the current node
+		KeQuerySystemTime(&(newEvent.Time));
+		newEvent.Function = Function;
+		newEvent.Action = Action;
+		newEvent.Status = Status;
+		curNode->Events[curNode->Size] = newEvent;
+		curNode->Size++;
+	} else if(curNode->Events[curNode->Size-1].Action != BufferOverflow) {
+		//overwrite last event with buffer overflow, unless last action was already a buffer overflow
+		KeQuerySystemTime(&(newEvent.Time));
+		newEvent.Action = BufferOverflow;
+		newEvent.Function = 0;
+		newEvent.Status = 0;
+		curNode->Events[curNode->Size-1] = newEvent;
+	}
+}
+
+
+/*
+	Increments the number of times that the API Function has returned the status Status
+	in the system info CseStatusInfo.  Note that CseStatusInfo
+	only keeps track of MAX_NUM_STATUSES for each API.  If MAX_NUM_STATUSES statuses are 
+	already in use and Status is not present in CseStatusInfo already, ignore the status.
+	Also adds the number of bytes used by the function, given a funciton is successful.
+	Also adds a return statement for the function to the history.
+*/
+VOID
+incStatus(
+	CSE451_APIS Function,
+	NTSTATUS Status,
+	ULONG BytesUsed
+	)
+{
+	
+	USHORT i;
+	ExAcquireFastMutex(&Cse451Mutex);
+	//go through each status being kept track of by the API called Function
+	//if you find the status has been called, increment that status
+	for(i = 0; i < Cse451Info.ApiStatus[Function].NumStatuses && i < MAX_NUM_STATUSES; i++) {
+		if(Cse451Info.ApiStatus[Function].StatusCounts[i].Status == Status) {
+			Cse451Info.ApiStatus[Function].StatusCounts[i].Count++;
+			break;
+		}
+	}
+	
+	//if the status hasn't been found and we have not reached the maximum number
+	//of statuses that we are keeping tack of, place the status into the array and give it a count of 1.
+	//also, increment the NumStatuses that we are keeping track of 
+	if(i == Cse451Info.ApiStatus[Function].NumStatuses && i < MAX_NUM_STATUSES) {
+		Cse451Info.ApiStatus[Function].StatusCounts[Cse451Info.ApiStatus[Function].NumStatuses].Status = Status;
+		Cse451Info.ApiStatus[Function].StatusCounts[Cse451Info.ApiStatus[Function].NumStatuses].Count = 1;
+		Cse451Info.ApiStatus[Function].NumStatuses++;
+	}
+	
+	if(NT_SUCCESS(Status)) {
+		Cse451Info.ApiStatus[Function].BytesUsed += BytesUsed;
+	}
+	
+	addToHistory(Function, Return, Status);
+	
+	ExReleaseFastMutex(&Cse451Mutex);
+}
+
+/*
+	adds a call statement for the function to the history
+*/
+VOID
+addHistCall(
+	CSE451_APIS Function
+	) 
+{
+	ExAcquireFastMutex(&Cse451Mutex);
+	addToHistory(Function, Call, 0);
+	ExReleaseFastMutex(&Cse451Mutex);
+}
+
+
+
 
 extern ULONG MmSystemCodePage;
 extern ULONG MmSystemCachePage;
@@ -1426,6 +1544,45 @@ Arguments:
 
         SystemInformation Format by Information Class:
 
+		SystemCSE451Information - Data Type is SYSTEM_CSE451_INFORMATION
+			
+			SYSTEM_CSE451_INFORMATION Structure
+				
+				CSE451_API_STATUS_COUNT ApiStatus[NUM_CSE451_APIS] - Keeps track of status 
+					for each of the APIs Listed in CSE451_APIS.
+				
+					ULONG BytesUsed - Number of bytes consumed by this function
+					
+					USHORT NumStatuses - Number of status codes being used by this API
+					
+					STATUS_COUNT StatusCounts[MAX_NUM_STATUSES] - Status code and number of times the
+						status code has appeared for this api
+						
+						NTSTATUS Status - status code
+						
+						ULONG Count - number of times the status has occured for the particular API
+				
+				ULONG NumEvents - Number of events held by the History event buffer; used as input for 
+					stating how many entries to return to the history buffer; modified to be the actual
+					number of events in History
+				
+				HIST_EVENT History[1] - List of events that occured from earliest in time (index 0) to most recent.
+					Please note that the history buffer only contains a certain number of events.  If there isn't enough
+					room in the history buffer when another event is issued, a BufferOverflow event replaces the last event 
+					in the buffer, and the oldest N events remain in the buffer.  When this function is called, it takes the
+					NumEvents oldest entries in the buffer and places them into the user's input.  Those NumEvents are then removed
+					from the system's history so that more events can be added to the system's buffer.
+				
+					LARGE_INTEGER Time - time that the event occured (granularity of 100ms)
+					
+					CSE451_APIS Function - API that called the function (specified by CSE451_APIS)
+					
+					CSE451_ACTIONS Action - Action that was taken with respect to the API (specied by CSE451_ACTIONS)
+						BufferOverflow occurs when you run out of history memory and is added to the end of the buffer.
+						This is simply there to show that there is a discontinuity in the history.
+						
+					NTSTATUS Status - Status code of the event if the action was Return
+			
         SystemBasicInformation - Data type is SYSTEM_BASIC_INFORMATION
 
             SYSTEM_BASIC_INFORMATION Structure
@@ -1722,12 +1879,18 @@ Return Value:
     PSYSTEM_SESSION_POOLTAG_INFORMATION SessionPoolTagInformation;
     PSYSTEM_SESSION_MAPPED_VIEW_INFORMATION SessionMappedViewInformation;
     ULONG SessionPoolTagInformationLength;
+	PHIST_LIST History;
+	PCSE451_API_STATUS_COUNT Api;
 
     NTSTATUS Status;
     PKPRCB Prcb;
     ULONG Length = 0;
     ULONG i;
-	USHORT j;
+	ULONG j = 0;
+	ULONG k = 0;
+	ULONG size;
+	ULONG NumEvents;
+	ULONG TotalNumEvents;
     ULONG ContextSwitches;
     PULONG TableLimit, TableCounts;
     PKSERVICE_TABLE_DESCRIPTOR Table;
@@ -1773,19 +1936,107 @@ Return Value:
 
         switch (SystemInformationClass) {
 
+		//copy the Cse451Info to the SystemInformation that they gave to us.
         case SystemCSE451Information:
-			//copy the Cse451Info to the SystemInformation that they gave to us.
+			ExAcquireFastMutex(&Cse451Mutex);
+			
+			//if there aren't any entries in the buffer, return STATUS_NO_MORE_ENTRIES
+			if(ChunkedHistory.Size == 0) {
+				Status = STATUS_NO_MORE_ENTRIES;
+			}
+			
+			//copy history information over
+			TotalNumEvents = ((PSYSTEM_CSE451_INFORMATION)SystemInformation)->NumEvents;
+
+			j = 0;
+			while(TotalNumEvents > 0 && ChunkedHistory.Size > j && ChunkedHistory.HistoryBlocks[j]->Size > 0) {
+				NumEvents = TotalNumEvents;
+				if(NumEvents > ChunkedHistory.HistoryBlocks[j]->Size) {
+					NumEvents = ChunkedHistory.HistoryBlocks[j]->Size;
+				}
+				memcpy(&(((PSYSTEM_CSE451_INFORMATION)SystemInformation)->History[j*NUM_EVENTS_PER_HIST_BLOCK]), 
+					&(ChunkedHistory.HistoryBlocks[j]->Events[0]), sizeof(HIST_EVENT)*NumEvents); 
+				TotalNumEvents -= NumEvents;
+				
+				if(NumEvents == NUM_EVENTS_PER_HIST_BLOCK) {
+					//remove entire unused history blocks
+					ExFreePool(ChunkedHistory.HistoryBlocks[j]);
+					j++;
+				} else {
+					//not a full block... must be last block
+					break;
+				}
+			}
+			//j is now the index of the first block with events that weren't flushed by the
+			//TotalNumEvents is now the number of events that they asked for that we didn't have
+			//NumEvents is now the number of events copied in the last block
+			((PSYSTEM_CSE451_INFORMATION)SystemInformation)->NumEvents -= TotalNumEvents;
+			
+			//move history block pointers up
+			k = 0;
+			while(j < ChunkedHistory.Size) {
+				ChunkedHistory.HistoryBlocks[k] = ChunkedHistory.HistoryBlocks[j];
+				k++;
+				j++;
+			}
+			ChunkedHistory.Size = k;
+			
+			//move events up in history blocks
+			//NumEvents only equals NUM_EVENTS_PER_HIST_BLOCK when a whole block was deleted,
+			// meaning the moving events portion would not be necessary
+			if(NumEvents < NUM_EVENTS_PER_HIST_BLOCK) {
+				if(ChunkedHistory.Size > 0) {
+					ChunkedHistory.HistoryBlocks[0]->Size -= NumEvents;
+				}
+				
+				for(j = 0; j < ChunkedHistory.Size; j++) {
+					memcpy(&(ChunkedHistory.HistoryBlocks[j]->Events[0]),
+						&(ChunkedHistory.HistoryBlocks[j]->Events[NumEvents]),
+						sizeof(HIST_EVENT)*(NUM_EVENTS_PER_HIST_BLOCK - NumEvents));
+						
+					if(j+1 < ChunkedHistory.Size) {
+						k = NumEvents;
+						if(k > ChunkedHistory.HistoryBlocks[j+1]->Size) {
+							k = ChunkedHistory.HistoryBlocks[j+1]->Size;
+						}
+						
+						memcpy(&(ChunkedHistory.HistoryBlocks[j]->Events[(NUM_EVENTS_PER_HIST_BLOCK - NumEvents)]),
+							&(ChunkedHistory.HistoryBlocks[j+1]->Events[0]), sizeof(HIST_EVENT)*k);
+						ChunkedHistory.HistoryBlocks[j]->Size += k;
+						ChunkedHistory.HistoryBlocks[j+1]->Size -= k;
+					}
+				}
+				
+				//if the copy of events upward made the last block empty, then remove it 
+				if(ChunkedHistory.Size > 0 && ChunkedHistory.HistoryBlocks[ChunkedHistory.Size-1]->Size <= 0) {
+					ChunkedHistory.Size--;
+					ExFreePool(ChunkedHistory.HistoryBlocks[ChunkedHistory.Size]);
+				}
+			}
+			
+			
+			
+			
+			//copy api statuses
 			for(j = 0; j < NUM_CSE451_APIS; j++) {
-				((PSYSTEM_CSE451_INFORMATION)SystemInformation)->ApiStatus[j].NumStatuses = Cse451Info.ApiStatus[j].NumStatuses;
-				((PSYSTEM_CSE451_INFORMATION)SystemInformation)->ApiStatus[j].BytesUsed = Cse451Info.ApiStatus[j].BytesUsed;
+				Api = &(((PSYSTEM_CSE451_INFORMATION)SystemInformation)->ApiStatus[j]);
+				Api->NumStatuses = Cse451Info.ApiStatus[j].NumStatuses;
+				Api->BytesUsed = Cse451Info.ApiStatus[j].BytesUsed;
 				for(i = 0; i < Cse451Info.ApiStatus[j].NumStatuses; i++) {
-					((PSYSTEM_CSE451_INFORMATION)SystemInformation)->ApiStatus[j].StatusCounts[i] = Cse451Info.ApiStatus[j].StatusCounts[i];
+					Api->StatusCounts[i] = Cse451Info.ApiStatus[j].StatusCounts[i];
 				}
 			}
 			
 			if (NT_SUCCESS (Status) && ARGUMENT_PRESENT( ReturnLength )) {
-				*ReturnLength = sizeof( SYSTEM_CSE451_INFORMATION );
+				size = ((PSYSTEM_CSE451_INFORMATION)SystemInformation)->NumEvents;
+				if(size == 0) {
+					size = 1;
+				}
+				*ReturnLength = sizeof( SYSTEM_CSE451_INFORMATION)+sizeof(HIST_EVENT)*(size-1);
 			}
+			
+			ExReleaseFastMutex(&Cse451Mutex);
+			
             break;
 
         case SystemBasicInformation:

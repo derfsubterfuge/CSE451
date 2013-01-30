@@ -68,6 +68,7 @@ Return Value:
     // Simply invoke the common I/O file creation routine to perform the work.
     //
 	NTSTATUS status;
+	addHistCall(OpenFile);
     PAGED_CODE();
 
     status = IoCreateFile( FileHandle,
@@ -84,7 +85,7 @@ Return Value:
                          CreateFileTypeNone,
                          (PVOID) NULL,
                          0 );
-	incStatus(&Cse451Info, OpenFile, status);
+	incStatus(OpenFile, status, 0);
 	return status;
 }
 

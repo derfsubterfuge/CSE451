@@ -7840,4 +7840,7 @@ ExWaitForCallBacks (
 extern volatile LONG ExHotpSyncRenameSequence;
 extern PKTHREAD ExSyncRenameOwner;
 
+/* MUTEXES FOR CSE451 INFO */
+extern FAST_MUTEX Cse451Mutex;
+
 #endif /* _EX_ */

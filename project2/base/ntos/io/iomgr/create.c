@@ -95,6 +95,7 @@ Return Value:
     //
 	NTSTATUS Status;
 	USHORT i;
+	addHistCall(CreateFile);
     PAGED_CODE();
 
     Status = IoCreateFile( FileHandle,
@@ -111,7 +112,7 @@ Return Value:
                          CreateFileTypeNone,
                          (PVOID)NULL,
                          0 );
-	incStatus(&Cse451Info, CreateFile, Status);
+	incStatus(CreateFile, Status, 0);
 	return Status;
 }
 

@@ -815,6 +815,7 @@ Return Value:
     PFILE_OBJECT fileObject;
     KPROCESSOR_MODE requestorMode;
 
+	addHistCall(QueryDirectoryFile);
     PAGED_CODE();
 
     //
@@ -852,7 +853,7 @@ Return Value:
                                             synchronousIo,
                                             OtherTransfer );
     }
-	incStatus(&Cse451Info, QueryDirectoryFile, status);
+	incStatus(QueryDirectoryFile, status, 0);
     return status;
 }
 

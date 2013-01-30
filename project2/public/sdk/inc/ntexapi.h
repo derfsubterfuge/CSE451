@@ -1211,6 +1211,8 @@ typedef struct _STATUS_COUNT {
 	ULONG Count;
 } STATUS_COUNT, *PSTATUS_COUNT;
 
+//#define MAX_CSE451_API_NAME_STR_LEN 40
+
 /*
 	CSE451_API_STATUS_COUNT represents what is being kept track of
 	for each API.  BytesUsed (only used by NtReadFile
@@ -1219,17 +1221,40 @@ typedef struct _STATUS_COUNT {
 	statuses starting from index 0, that are currently in use or have
 	been returned by some function.  
 */
+
 typedef struct _CSE451_API_STATUS_COUNT {
     ULONG BytesUsed;
 	USHORT NumStatuses;
 	STATUS_COUNT StatusCounts[MAX_NUM_STATUSES];
 } CSE451_API_STATUS_COUNT, *PCSE451_API_STATUS_COUNT;
 
+
 /*
 	This is the number of APIs that SYSTEM_CSE451_INFORMATION
 	is keeping track of
 */
 #define NUM_CSE451_APIS 7
+
+/*
+	Size (bytes) of the amount of memory in each history block
+*/
+#define HISTORY_BLOCK_SIZE (4*1024)
+
+/*
+	Size (bytes) of the amount of memory in the whole history
+	(excluding auxillary data for managing all of the history events)
+*/
+#define MAX_HISTORY_SIZE (64*1024)
+
+/*
+	Maximum number of history blocks in the buffer
+*/
+#define NUM_HISTORY_BLOCKS (MAX_HISTORY_SIZE / HISTORY_BLOCK_SIZE)
+
+/*
+	Maximum number of history events in each block
+*/
+#define NUM_EVENTS_PER_HIST_BLOCK ((HISTORY_BLOCK_SIZE - sizeof(ULONG)) / sizeof(HIST_EVENT))
 
 /*
 	These are the APIs that SYSTEM_CSE451_INFORMATION is keeping track of
@@ -1245,17 +1270,39 @@ typedef enum _CSE451_APIS {
 } CSE451_APIS;
 
 /*
-	This is the string representation of the CSE451_APIS enum
+	Actions for each of the APIs that can be placed in the buffer
 */
-const char * const CSE451_APIS_STRINGS[] = {
-	"NtCreateFile", 
-	"NtOpenFile", 
-	"NtReadFile", 
-	"NtWriteFile", 
-	"NtQueryInformationFile", 
-	"NtSetInformationFile",
-	"NtQueryDirectoryFile" 
-};
+typedef enum _CSE451_ACTIONS {
+	Call,
+	Return,
+	BufferOverflow
+} CSE451_ACTIONS;
+
+/*
+	Single history event for the buffer
+*/
+typedef struct _HIST_EVENT {
+	LARGE_INTEGER Time; //(granularity of 100ms)
+	CSE451_APIS Function;
+	CSE451_ACTIONS Action;
+	NTSTATUS Status;
+} HIST_EVENT, *PHIST_EVENT;
+
+/*
+	Chunks of History events
+*/
+typedef struct _HIST_LIST_BLOCK {
+	ULONG Size;  //from index 0 not start index
+	HIST_EVENT Events[NUM_EVENTS_PER_HIST_BLOCK];
+} HIST_LIST_BLOCK, *PHIST_LIST_BLOCK;
+
+/*
+	Pointer to all of the blocks in use
+*/
+typedef struct _HIST_LIST {
+	ULONG Size; //number of blocks
+	PHIST_LIST_BLOCK HistoryBlocks[NUM_HISTORY_BLOCKS];
+} HIST_LIST, *PHIST_LIST;
 
 /*
 	This represents all of the data being kept track of by each API.
@@ -1263,41 +1310,28 @@ const char * const CSE451_APIS_STRINGS[] = {
 */
 typedef struct _SYSTEM_CSE451_INFORMATION {
     CSE451_API_STATUS_COUNT ApiStatus[NUM_CSE451_APIS];
+	ULONG NumEvents;
+	HIST_EVENT History[1];
 } SYSTEM_CSE451_INFORMATION, *PSYSTEM_CSE451_INFORMATION;
 
 /*
-	Increments the number of times that the API Function has returned the status Status
-	in the system info CseStatusInfo.  Note that CseStatusInfo
-	only keeps track of MAX_NUM_STATUSES for each API.  If MAX_NUM_STATUSES statuses are 
-	already in use and Status is not present in CseStatusInfo already, ignore the status.
+	acts as a constructor for SYSTEM_CSE451_INFORMATION
 */
-FORCEINLINE
-VOID
-incStatus(
-	PSYSTEM_CSE451_INFORMATION CseStatusInfo,
-	CSE451_APIS Function,
-	NTSTATUS Status
-	)
-{
-	USHORT i;
-	//go through each status being kept track of by the API called Function
-	//if you find the status has been called, increment that status
-	for(i = 0; i < CseStatusInfo->ApiStatus[Function].NumStatuses && i < MAX_NUM_STATUSES; i++) {
-		if(CseStatusInfo->ApiStatus[Function].StatusCounts[i].Status == Status) {
-			CseStatusInfo->ApiStatus[Function].StatusCounts[i].Count++;
-			break;
-		}
-	}
-	
-	//if the status hasn't been found and we have not reached the maximum number
-	//of statuses that we are keeping tack of, place the status into the array and give it a count of 1.
-	//also, increment the NumStatuses that we are keeping track of 
-	if(i == CseStatusInfo->ApiStatus[Function].NumStatuses && i < MAX_NUM_STATUSES) {
-		CseStatusInfo->ApiStatus[Function].StatusCounts[CseStatusInfo->ApiStatus[Function].NumStatuses].Status = Status;
-		CseStatusInfo->ApiStatus[Function].StatusCounts[CseStatusInfo->ApiStatus[Function].NumStatuses].Count = 1;
-		CseStatusInfo->ApiStatus[Function].NumStatuses++;
-	}
+#define InitializeCse451Info() \
+{ \
+	{ \
+		{0, 0, {{0, 0}, {0, 0}, {0, 0}, {0, 0}, {0, 0}, {0, 0}, {0, 0}, {0, 0}}}, \
+		{0, 0, {{0, 0}, {0, 0}, {0, 0}, {0, 0}, {0, 0}, {0, 0}, {0, 0}, {0, 0}}}, \
+		{0, 0, {{0, 0}, {0, 0}, {0, 0}, {0, 0}, {0, 0}, {0, 0}, {0, 0}, {0, 0}}}, \
+		{0, 0, {{0, 0}, {0, 0}, {0, 0}, {0, 0}, {0, 0}, {0, 0}, {0, 0}, {0, 0}}}, \
+		{0, 0, {{0, 0}, {0, 0}, {0, 0}, {0, 0}, {0, 0}, {0, 0}, {0, 0}, {0, 0}}}, \
+		{0, 0, {{0, 0}, {0, 0}, {0, 0}, {0, 0}, {0, 0}, {0, 0}, {0, 0}, {0, 0}}}, \
+		{0, 0, {{0, 0}, {0, 0}, {0, 0}, {0, 0}, {0, 0}, {0, 0}, {0, 0}, {0, 0}}} \
+	}, \
+	0, \
+	{0, 0, 0, 0} \
 }
+
 
 typedef struct _SYSTEM_BASIC_INFORMATION {
     ULONG Reserved;

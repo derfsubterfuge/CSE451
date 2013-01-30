@@ -27,10 +27,7 @@ const KPRIORITY IopCacheHitIncrement = IO_NO_INCREMENT;
 #pragma alloc_text(PAGE, NtReadFile)
 #pragma alloc_text(PAGE, NtReadFileScatter)
 
-#define INC_STATUS_READFILE(status); incStatus(&Cse451Info, ReadFile, status); \
-	if(NT_SUCCESS(status)) { \
-		Cse451Info.ApiStatus[ReadFile].BytesUsed += Length; \
-	}
+#define INC_STATUS_READFILE(status); incStatus(ReadFile, status, Length); 
 NTSTATUS
 NtReadFile (
     __in HANDLE FileHandle,
@@ -107,7 +104,7 @@ Return Value:
     PULONG majorFunction;
     PETHREAD CurrentThread;
 
-
+	addHistCall(ReadFile);
 	PAGED_CODE();
 
 	//

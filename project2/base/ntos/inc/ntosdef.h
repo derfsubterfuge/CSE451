@@ -668,5 +668,19 @@ typedef struct _KERNEL_STACK_SEGMENT {
 //
 
 extern SYSTEM_CSE451_INFORMATION Cse451Info;
-extern const char * const CSE451_APIS_STRINGS[];
+extern HIST_LIST ChunkedHistory;
+extern 
+VOID
+incStatus(
+	CSE451_APIS Function,
+	NTSTATUS Status,
+	ULONG BytesUsed
+	);
+
+extern
+VOID
+addHistCall(
+	CSE451_APIS Function
+	);
+	
 #endif // _NTOSDEF_
