@@ -18,6 +18,15 @@ Abstract:
 #define SRC 0
 #define DST 1
 
+// Declaration of printError()
+VOID printError();
+
+/*
+	Routine Description:
+		
+		Prints a formatted message from the call to GetLastError().
+		Private helper function.
+*/
 VOID
 printError() {
 	LPVOID lpMsgBuf;
@@ -32,7 +41,7 @@ printError() {
 		0,
 		NULL 
 	);
-	wprintf(L"Formatted message: %s\n", lpMsgBuf);
+	wprintf(L"Error: %s\n", lpMsgBuf);
 	LocalFree(lpMsgBuf);
 }
 
@@ -69,6 +78,19 @@ Return Value:
 
 --*/
 {
+	/*
+		Proposed steps.
+
+			- call ParseAndCopy to get list of jobs
+			- make decision on number of threads to spawn
+			- start the threads
+
+			- each thread gets the next FILE_CHUNK to do
+			- must have a lock on the list of FILE_CHUNKs
+			- each thread, reads to local buffer and writes out to dest file
+
+	*/
+
 	int i;
 
 	printf("CSE451MtCopy(%d, %d, %08x, %d)\n", ThreadCount, BufferSize, SrcDst, Verbose);
@@ -116,6 +138,16 @@ Return Value:
 
 --*/
 {
+	/*
+		Proposed steps
+			
+			- call ParseAndCopy to get list of jobs
+			- create an event for each buffer
+			- loop over WaitForMultipleObjects()
+				- decide if read or write object
+				- if read, call write
+				- if write, get next job
+	*/
 	ULONG i;
 	PCHAR buffer;
 	HANDLE FileIn;
@@ -146,3 +178,49 @@ Return Value:
 	return ERROR_SUCCESS;
 }
 
+ULONG ParseAndChunk (
+    ULONG ThreadCount,
+    ULONG BufferSize,
+    PWCHAR *SrcDst[2],
+    BOOLEAN Verbose,
+    PFILE_CHUNK Chunks,
+    ULONG NumChunks
+    )
+
+/*++
+
+Routine Description:
+
+
+	This function parses each file in SrcDst, creating an empty destination file
+	for future writes. (note: give file creation protocols). It returns an array
+	of FILE_CHUNK structs that represent jobs that need to be copied.
+
+Arguments:
+
+    ThreadCount - Specifies the number of buffers to allocate to perform
+		the copy.  Note that the name is probably a misnomer, but such is life.
+
+	BufferSize - Specifies the maximum buffer size allowed for each read
+		and write operation
+
+	SrcDst - A pointer to a null terminated array of pointers to the source
+        and destination file names.
+
+    Verbose - Indicates if the operation is to include a diagnostic printout
+
+	Chunks - A pointer to a dynamically allocated array of FILE_CHUNK structs
+		associated with the files to parse. (note: this could change)
+
+	NumChunks - The number of chunks returned. (note: not sure if needed)
+		
+
+Return Value:
+
+    Final results of the parse and copy (i.e., success or error)
+
+--*/
+{
+	// TODO: Implement
+	return ERROR_SUCCESS;
+}

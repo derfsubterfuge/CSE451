@@ -1,47 +1,9 @@
-﻿Build started 1/31/2013 9:52:04 PM.
-     1>Project "C:\copy\CSE451Project3\CSE451Project3.vcxproj" on node 2 (build target(s)).
-     1>PrepareForBuild:
-         Creating directory "C:\copy\Debug\".
-       InitializeBuildStatus:
-         Creating "Debug\CSE451Project3.unsuccessfulbuild" because "AlwaysCreate" was specified.
-       ClCompile:
-         c:\Program Files (x86)\Microsoft Visual Studio 10.0\VC\bin\CL.exe /c /ZI /nologo /W3 /WX- /Od /Oy- /D WIN32 /D _DEBUG /D _CONSOLE /D _UNICODE /D UNICODE /Gm /EHsc /RTC1 /MDd /GS /fp:precise /Zc:wchar_t /Zc:forScope /Yc"StdAfx.h" /Fp"Debug\CSE451Project3.pch" /Fo"Debug\\" /Fd"Debug\vc100.pdb" /Gd /TC /analyze- /errorReport:prompt stdafx.c
-         stdafx.c
-         c:\Program Files (x86)\Microsoft Visual Studio 10.0\VC\bin\CL.exe /c /ZI /nologo /W3 /WX- /Od /Oy- /D WIN32 /D _DEBUG /D _CONSOLE /D _UNICODE /D UNICODE /Gm /EHsc /RTC1 /MDd /GS /fp:precise /Zc:wchar_t /Zc:forScope /Yu"StdAfx.h" /Fp"Debug\CSE451Project3.pch" /Fo"Debug\\" /Fd"Debug\vc100.pdb" /Gd /TC /analyze- /errorReport:prompt CSE451Project3.c CSECopy.c
-         CSECopy.c
-         CSE451Project3.c
-     1>c:\copy\cse451project3\cse451project3.c(188): warning C4996: 'wcscpy': This function or variable may be unsafe. Consider using wcscpy_s instead. To disable deprecation, use _CRT_SECURE_NO_WARNINGS. See online help for details.
-                 c:\program files (x86)\microsoft visual studio 10.0\vc\include\wchar.h(988) : see declaration of 'wcscpy'
-     1>c:\copy\cse451project3\cse451project3.c(197): warning C4996: 'wcscpy': This function or variable may be unsafe. Consider using wcscpy_s instead. To disable deprecation, use _CRT_SECURE_NO_WARNINGS. See online help for details.
-                 c:\program files (x86)\microsoft visual studio 10.0\vc\include\wchar.h(988) : see declaration of 'wcscpy'
-         Generating Code...
-       ManifestResourceCompile:
-         C:\Program Files (x86)\Microsoft SDKs\Windows\v7.0A\bin\rc.exe /nologo /fo"Debug\CSE451Project3.exe.embed.manifest.res" Debug\CSE451Project3_manifest.rc 
-     1>C:\Program Files (x86)\MSBuild\Microsoft.Cpp\v4.0\Microsoft.CppBuild.targets(990,5): warning MSB8012: TargetPath(C:\copy\Debug\CSE451Project3.exe) does not match the Linker's OutputFile property value (C:\copy\Debug\mtcopy.exe). This may cause your project to build incorrectly. To correct this, please make sure that $(OutDir), $(TargetName) and $(TargetExt) property values match the value specified in %(Link.OutputFile).
-     1>C:\Program Files (x86)\MSBuild\Microsoft.Cpp\v4.0\Microsoft.CppBuild.targets(992,5): warning MSB8012: TargetName(CSE451Project3) does not match the Linker's OutputFile property value (mtcopy). This may cause your project to build incorrectly. To correct this, please make sure that $(OutDir), $(TargetName) and $(TargetExt) property values match the value specified in %(Link.OutputFile).
-       Link:
-         c:\Program Files (x86)\Microsoft Visual Studio 10.0\VC\bin\link.exe /ERRORREPORT:PROMPT /OUT:"C:\copy\Debug\mtcopy.exe" /INCREMENTAL /NOLOGO kernel32.lib user32.lib gdi32.lib winspool.lib comdlg32.lib advapi32.lib shell32.lib ole32.lib oleaut32.lib uuid.lib odbc32.lib odbccp32.lib /MANIFEST /ManifestFile:"Debug\CSE451Project3.exe.intermediate.manifest" /MANIFESTUAC:"level='asInvoker' uiAccess='false'" /DEBUG /PDB:"C:\copy\Debug\CSE451Project3.pdb" /SUBSYSTEM:CONSOLE /TLBID:1 /DYNAMICBASE:NO /IMPLIB:"C:\copy\Debug\CSE451Project3.lib" /MACHINE:X86 Debug\CSE451Project3.exe.embed.manifest.res
-         Debug\CSE451Project3.obj
-         Debug\CSECopy.obj
-         Debug\stdafx.obj
-         wsetargv.obj
-     1>wsetargv.obj : warning LNK4099: PDB 'libcmt.pdb' was not found with 'wsetargv.obj' or at 'C:\copy\Debug\libcmt.pdb'; linking object as if no debug info
-       Manifest:
-         C:\Program Files (x86)\Microsoft SDKs\Windows\v7.0A\bin\mt.exe /nologo /verbose /out:"Debug\CSE451Project3.exe.embed.manifest" /manifest Debug\CSE451Project3.exe.intermediate.manifest
-         C:\Program Files (x86)\Microsoft SDKs\Windows\v7.0A\bin\rc.exe /nologo /fo"Debug\CSE451Project3.exe.embed.manifest.res" Debug\CSE451Project3_manifest.rc 
-       LinkEmbedManifest:
-         c:\Program Files (x86)\Microsoft Visual Studio 10.0\VC\bin\link.exe /ERRORREPORT:PROMPT /OUT:"C:\copy\Debug\mtcopy.exe" /INCREMENTAL /NOLOGO kernel32.lib user32.lib gdi32.lib winspool.lib comdlg32.lib advapi32.lib shell32.lib ole32.lib oleaut32.lib uuid.lib odbc32.lib odbccp32.lib /MANIFEST /ManifestFile:"Debug\CSE451Project3.exe.intermediate.manifest" /MANIFESTUAC:"level='asInvoker' uiAccess='false'" /DEBUG /PDB:"C:\copy\Debug\CSE451Project3.pdb" /SUBSYSTEM:CONSOLE /TLBID:1 /DYNAMICBASE:NO /IMPLIB:"C:\copy\Debug\CSE451Project3.lib" /MACHINE:X86 Debug\CSE451Project3.exe.embed.manifest.res
-         Debug\CSE451Project3.obj
-         Debug\CSECopy.obj
-         Debug\stdafx.obj
-         wsetargv.obj
-     1>wsetargv.obj : warning LNK4099: PDB 'libcmt.pdb' was not found with 'wsetargv.obj' or at 'C:\copy\Debug\libcmt.pdb'; linking object as if no debug info
-         CSE451Project3.vcxproj -> C:\copy\Debug\CSE451Project3.exe
-       FinalizeBuildStatus:
-         Deleting file "Debug\CSE451Project3.unsuccessfulbuild".
-         Touching "Debug\CSE451Project3.lastbuildstate".
-     1>Done Building Project "C:\copy\CSE451Project3\CSE451Project3.vcxproj" (build target(s)).
+﻿Build started 2/5/2013 7:37:43 PM.
+     1>Project "Z:\cse451\cse451repo\project3\CSE451Project3\CSE451Project3.vcxproj" on node 2 (clean target(s)).
+     1>_PrepareForClean:
+         Deleting file "Debug\CSE451Project3.lastbuildstate".
+     1>Done Building Project "Z:\cse451\cse451repo\project3\CSE451Project3\CSE451Project3.vcxproj" (clean target(s)).
 
 Build succeeded.
 
-Time Elapsed 00:00:02.24
+Time Elapsed 00:00:00.28
