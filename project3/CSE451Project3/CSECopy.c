@@ -268,6 +268,7 @@ Return Value:
 		if ((SrcFileData[i].size % ChunkSize) > 0) {
 			(*NumChunks)++;
 		}
+		CloseHandle(FileIn);
 	}
 
 	// sort by sizes
@@ -304,6 +305,6 @@ Return Value:
 		j++;
 	}
 	
-
+	free(SrcFileData);
 	return ERROR_SUCCESS;
 }
