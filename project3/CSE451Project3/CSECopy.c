@@ -18,33 +18,90 @@ Abstract:
 #define SRC 0
 #define DST 1
 
+#define MAX_THREADS 8
+
 // Declaration of printError()
-VOID printError();
+VOID PrintError();
 
-/*
-	Routine Description:
+typedef struct _COPY_THREAD_DATA {
+	PFILE_CHUNK Chunks;
+	PULONG NextChunk;
+	ULONG NumChunks;
+	PHANDLE Mutex;
+	ULONG BufferSize;
+} COPY_THREAD_DATA, * PCOPY_THREAD_DATA;
+
+
+DWORD WINAPI ThreadCopy(
+	LPVOID threadData
+	)
+{
+	PCOPY_THREAD_DATA cThreadData = (PCOPY_THREAD_DATA)threadData;
+	PCHAR Buffer = (PCHAR)malloc(cThreadData->BufferSize);
+	DWORD BytesRead;
+	DWORD BytesWrite;
+	HANDLE FileIn;
+	PWCHAR FileInName;
+	HANDLE FileOut;
+	ULONG i;
+
+	while(TRUE) {
+		WaitForSingleObject(*(cThreadData->Mutex), INFINITE);
 		
-		Prints a formatted message from the call to GetLastError().
-		Private helper function.
-*/
-VOID
-printError() {
-	LPVOID lpMsgBuf;
-	FormatMessage( 
-		FORMAT_MESSAGE_ALLOCATE_BUFFER | 
-		FORMAT_MESSAGE_FROM_SYSTEM | 
-		FORMAT_MESSAGE_IGNORE_INSERTS,
-		NULL,
-		GetLastError(),
-		MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT), // Default language
-		(LPTSTR) &lpMsgBuf,
-		0,
-		NULL 
-	);
-	wprintf(L"Error: %s\n", lpMsgBuf);
-	LocalFree(lpMsgBuf);
-}
+		i = *(cThreadData->NextChunk);
+		(*(cThreadData->NextChunk))++;
+		
+		ReleaseMutex(*(cThreadData->Mutex));
 
+		if(i >= cThreadData->NumChunks)
+			break;
+
+		FileIn = CreateFile(
+			cThreadData->Chunks[i].src,
+			GENERIC_READ,
+			7,
+			NULL,
+			OPEN_EXISTING,
+			FILE_ATTRIBUTE_NORMAL,
+			NULL);
+
+		FileOut = CreateFile(
+			cThreadData->Chunks[i].dst,
+			GENERIC_WRITE,
+			7,
+			NULL,
+			OPEN_EXISTING,
+			FILE_ATTRIBUTE_NORMAL,
+			NULL);
+
+		//TODO: keep track of which file we are on... if we already have same file open, then reuse it
+
+		SetFilePointer(FileIn, /*TODO: convert to LONG from ULONG*/ (LONG)cThreadData->Chunks[i].start, NULL, FILE_BEGIN);
+		SetFilePointer(FileOut, /*TODO: convert to LONG from ULONG*/ (LONG)cThreadData->Chunks[i].start, NULL, FILE_BEGIN);
+
+		ReadFile(FileIn, Buffer, cThreadData->Chunks[i].length, &BytesRead, NULL);
+		WriteFile(FileOut, Buffer, cThreadData->Chunks[i].length, &BytesWrite, NULL); //TODO: fix to incorporate actual bytes read and written
+
+		CloseHandle(FileIn);
+		CloseHandle(FileOut);
+
+		printf("Chunk %d\n", i);
+		printf("\tSrcName: %S\n", cThreadData->Chunks[i].src);
+		printf("\tDstName: %S\n", cThreadData->Chunks[i].dst);
+		printf("\tStart: %d\n", cThreadData->Chunks[i].start);
+		printf("\tLength: %d\n", cThreadData->Chunks[i].length);
+	}
+	/*while((i = *(cThreadData->NextChunk)) < cThreadData->NumChunks) {
+		(*(cThreadData->NextChunk))++;
+		printf("Chunk %d\n", i);
+		printf("\tSrcName: %S\n", cThreadData->Chunks[i].src);
+		printf("\tDstName: %S\n", cThreadData->Chunks[i].dst);
+		printf("\tStart: %d\n", cThreadData->Chunks[i].start);
+		printf("\tLength: %d\n", cThreadData->Chunks[i].length);
+	}*/
+
+	return 0;
+}
 
 ULONG CSE451MtCopy (
     ULONG ThreadCount,
@@ -91,24 +148,74 @@ Return Value:
 
 	*/
 
-	int i;
+	ULONG i;
 	PFILE_CHUNK Chunks;
 	ULONG NumChunks;
+	PCOPY_THREAD_DATA ThreadData;
+	PHANDLE Threads;
+	PULONG ThreadIDs;
+	ULONG NextChunk;
+	HANDLE Mutex;
 
 	printf("CSE451MtCopy(%d, %d, %08x, %d)\n", ThreadCount, BufferSize, SrcDst, Verbose);
 
-	ParseAndChunk(ThreadCount, BufferSize, SrcDst, Verbose, &Chunks, &NumChunks);
+	ParseAndChunk(BufferSize, SrcDst, Verbose, &Chunks, &NumChunks);
 
-	for (i = 0; i < NumChunks; i++) {
+	/*for (i = 0; i < NumChunks; i++) {
 		printf("Chunk %d\n", i);
-		printf("\tFileName: %S\n", Chunks[i].filename);
+		printf("\tSrcName: %S\n", Chunks[i].src);
+		printf("\tDstName: %S\n", Chunks[i].dst);
 		printf("\tStart: %d\n", Chunks[i].start);
 		printf("\tLength: %d\n", Chunks[i].length);
 	}
 
 	for (i = 0; SrcDst[i] != NULL; i++) {
-		printf("SrcDst[%d] = %08x => %08x, %08x => \"%S\" \"%S\"\n", i, SrcDst[i], SrcDst[i][0], SrcDst[i][1], SrcDst[i][0], SrcDst[i][1]);
+		printf("SrcDst[%d] = %08x => %08x, %08x => \"%S\" \"%S\"\n", i, SrcDst[i], SrcDst[i][SRC], SrcDst[i][DST], SrcDst[i][SRC], SrcDst[i][DST]);
+	}*/
+
+	if(ThreadCount > MAX_THREADS)
+		ThreadCount = MAX_THREADS;
+	if(ThreadCount > NumChunks)
+		ThreadCount = NumChunks;
+
+	//TODO: add max buffer size
+
+	ThreadData = (PCOPY_THREAD_DATA)malloc(sizeof(COPY_THREAD_DATA)*ThreadCount);
+	ThreadIDs = (PULONG)malloc(sizeof(ULONG)*ThreadCount);
+	Threads = (PHANDLE)malloc(sizeof(HANDLE)*ThreadCount);
+	Mutex = CreateMutex(NULL,FALSE,NULL);
+
+	NextChunk = 0;
+	for(i = 0; i < ThreadCount; i++) {
+		ThreadData[i].Chunks = Chunks;
+		ThreadData[i].NextChunk = &NextChunk;
+		ThreadData[i].NumChunks = NumChunks;
+		ThreadData[i].Mutex = &Mutex;
+		ThreadData[i].BufferSize = BufferSize;
+		Threads[i] = CreateThread(
+					NULL, 
+					0, 
+					ThreadCopy,
+					&(ThreadData[i]),
+					0,
+					&(ThreadIDs[i]));
 	}
+
+	WaitForMultipleObjects(
+		ThreadCount,
+		Threads,
+		TRUE,
+		INFINITE);
+
+	for(i = 0; i < ThreadCount; i++) {
+		printf("%d\n", ThreadIDs[i]);
+		CloseHandle(Threads[i]);
+	}
+
+	free(Chunks);
+	free(ThreadData);
+	free(Threads);
+	free(ThreadIDs);
 
 	return ERROR_SUCCESS;
 }
@@ -190,7 +297,6 @@ Return Value:
 }
 
 ULONG ParseAndChunk (
-    ULONG ThreadCount,
     ULONG BufferSize,
     PWCHAR *SrcDst[2],
     BOOLEAN Verbose,
@@ -208,9 +314,6 @@ Routine Description:
 	of FILE_CHUNK structs that represent jobs that need to be copied.
 
 Arguments:
-
-    ThreadCount - Specifies the number of buffers to allocate to perform
-		the copy.  Note that the name is probably a misnomer, but such is life.
 
 	BufferSize - Specifies the maximum buffer size allowed for each read
 		and write operation
@@ -235,7 +338,8 @@ Return Value:
 	// TODO: Implement
 	ULONG ChunkSize;
 	HANDLE FileIn;
-	PFILE_DATA SrcFileData;
+	HANDLE FileOut;
+	PFILE_DATA SrcDstFileData;
 	ULONG i;
 	ULONG j;
 	ULONG NumFiles;
@@ -247,40 +351,51 @@ Return Value:
 
 	ChunkSize = BufferSize;
 
+	//TODO: check for duplicate destination files
+
 	// See how many files there are
 	for (i = 0, NumFiles = 0; SrcDst[i] != NULL; i++) {
 		NumFiles++;
 	}
 
 	// malloc space for keeping track of files
-	SrcFileData = (PFILE_DATA) malloc(sizeof(FILE_DATA) * NumFiles);
+	SrcDstFileData = (PFILE_DATA) malloc(sizeof(FILE_DATA) * NumFiles);
 
 	// open each file source
 	// record sizes
 	// record data in SrcFileData
 	// keep track of how many total chunks we need
+	// create destination files
 	*NumChunks = 0;
 	for (i = 0; SrcDst[i] != NULL; i++) {
+		//TODO: handle doesn't exist
 		FileIn = CreateFile(SrcDst[i][SRC], GENERIC_READ, FILE_SHARE_READ, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
-		SrcFileData[i].filename = SrcDst[i][SRC];
-		SrcFileData[i].size = GetFileSize(FileIn, NULL);
-		(*NumChunks) += SrcFileData[i].size / ChunkSize;
-		if ((SrcFileData[i].size % ChunkSize) > 0) {
+		SrcDstFileData[i].src = SrcDst[i][SRC];
+		SrcDstFileData[i].dst = SrcDst[i][DST];
+		SrcDstFileData[i].size = GetFileSize(FileIn, NULL); //TODO: handle large file sizes (second argument)
+		(*NumChunks) += SrcDstFileData[i].size / ChunkSize;
+		if ((SrcDstFileData[i].size % ChunkSize) > 0) {
 			(*NumChunks)++;
 		}
 		CloseHandle(FileIn);
+
+		//create destination files
+		//TODO: always overwrite?
+		//TODO: handle bad file path
+		FileOut = CreateFile(SrcDst[i][DST], GENERIC_WRITE, FILE_SHARE_WRITE, NULL, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL);
+		CloseHandle(FileOut);
 	}
 
 	// sort by sizes
 	// insertion sort
 	for (i = 1; i < NumFiles; i++) {
-		ValueToInsert = SrcFileData[i];
+		ValueToInsert = SrcDstFileData[i];
 		HolePos = i;
-		while (HolePos > 0 && ValueToInsert.size < SrcFileData[HolePos - 1].size) {
-			SrcFileData[HolePos] = SrcFileData[HolePos - 1];
+		while (HolePos > 0 && ValueToInsert.size < SrcDstFileData[HolePos - 1].size) {
+			SrcDstFileData[HolePos] = SrcDstFileData[HolePos - 1];
 			HolePos--;
 		}
-		SrcFileData[HolePos] = ValueToInsert;
+		SrcDstFileData[HolePos] = ValueToInsert;
 	}
 
 	// create chunks of the files in order
@@ -291,20 +406,47 @@ Return Value:
 		// start at begining
 		CurrentPos = 0;
 		// while we can make another full chunk
-		while ((CurrentPos + ChunkSize) < SrcFileData[i].size) {
-			(*Chunks)[j].filename = SrcFileData[i].filename;
+		while ((CurrentPos + ChunkSize) < SrcDstFileData[i].size) {
+			(*Chunks)[j].src = SrcDstFileData[i].src;
+			(*Chunks)[j].dst = SrcDstFileData[i].dst;
 			(*Chunks)[j].start = CurrentPos;
 			(*Chunks)[j].length = ChunkSize;
 			CurrentPos += ChunkSize;
 			j++;
 		}
 		// make partial chunk
-		(*Chunks)[j].filename = SrcFileData[i].filename;
+		(*Chunks)[j].src = SrcDstFileData[i].src;
+		(*Chunks)[j].dst = SrcDstFileData[i].dst;
 		(*Chunks)[j].start = CurrentPos;
-		(*Chunks)[j].length = SrcFileData[i].size - CurrentPos;
+		(*Chunks)[j].length = SrcDstFileData[i].size - CurrentPos;
 		j++;
 	}
 	
-	free(SrcFileData);
+	free(SrcDstFileData);
 	return ERROR_SUCCESS;
+}
+
+
+/*
+	Routine Description:
+		
+		Prints a formatted message from the call to GetLastError().
+		Private helper function.
+*/
+VOID
+printError() {
+	LPVOID lpMsgBuf;
+	FormatMessage( 
+		FORMAT_MESSAGE_ALLOCATE_BUFFER | 
+		FORMAT_MESSAGE_FROM_SYSTEM | 
+		FORMAT_MESSAGE_IGNORE_INSERTS,
+		NULL,
+		GetLastError(),
+		MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT), // Default language
+		(LPTSTR) &lpMsgBuf,
+		0,
+		NULL 
+	);
+	wprintf(L"Error: %s\n", lpMsgBuf);
+	LocalFree(lpMsgBuf);
 }
