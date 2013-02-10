@@ -17,9 +17,14 @@ ULONG CSE451MtCopy( ULONG ThreadCount, ULONG BufferSize, PWCHAR *SrcDst[2], BOOL
 ULONG CSE451MtCopyAsync( ULONG ThreadCount, ULONG BufferSize, PWCHAR *SrcDst[2], BOOLEAN Verbose );
 
 typedef struct _FILE_CHUNK {
-	PCHAR filename;
+	PWCHAR filename;
 	ULONG start;
 	ULONG length;
 } FILE_CHUNK, *PFILE_CHUNK;
 
-ULONG ParseAndChunk( ULONG ThreadCount, ULONG BufferSize, PWCHAR *SrcDst[2], BOOLEAN Verbose, PFILE_CHUNK Chunks, ULONG NumChunks );
+typedef struct _FILE_DATA {
+	PWCHAR filename;
+	ULONG size;
+} FILE_DATA, *PFILE_DATA;
+
+ULONG ParseAndChunk( ULONG ThreadCount, ULONG BufferSize, PWCHAR *SrcDst[2], BOOLEAN Verbose, PFILE_CHUNK * Chunks, PULONG NumChunks );

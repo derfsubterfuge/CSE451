@@ -81,7 +81,7 @@ Return Value:
 	/*
 		Proposed steps.
 
-			- call ParseAndCopy to get list of jobs
+			- call ParseAndChunk to get list of jobs
 			- make decision on number of threads to spawn
 			- start the threads
 
@@ -92,8 +92,19 @@ Return Value:
 	*/
 
 	int i;
+	PFILE_CHUNK Chunks;
+	ULONG NumChunks;
 
 	printf("CSE451MtCopy(%d, %d, %08x, %d)\n", ThreadCount, BufferSize, SrcDst, Verbose);
+
+	ParseAndChunk(ThreadCount, BufferSize, SrcDst, Verbose, &Chunks, &NumChunks);
+
+	for (i = 0; i < NumChunks; i++) {
+		printf("Chunk %d\n", i);
+		printf("\tFileName: %S\n", Chunks[i].filename);
+		printf("\tStart: %d\n", Chunks[i].start);
+		printf("\tLength: %d\n", Chunks[i].length);
+	}
 
 	for (i = 0; SrcDst[i] != NULL; i++) {
 		printf("SrcDst[%d] = %08x => %08x, %08x => \"%S\" \"%S\"\n", i, SrcDst[i], SrcDst[i][0], SrcDst[i][1], SrcDst[i][0], SrcDst[i][1]);
@@ -141,7 +152,7 @@ Return Value:
 	/*
 		Proposed steps
 			
-			- call ParseAndCopy to get list of jobs
+			- call ParseAndChunk to get list of jobs
 			- create an event for each buffer
 			- loop over WaitForMultipleObjects()
 				- decide if read or write object
@@ -183,8 +194,8 @@ ULONG ParseAndChunk (
     ULONG BufferSize,
     PWCHAR *SrcDst[2],
     BOOLEAN Verbose,
-    PFILE_CHUNK Chunks,
-    ULONG NumChunks
+	PFILE_CHUNK * Chunks,
+    PULONG NumChunks
     )
 
 /*++
@@ -222,5 +233,77 @@ Return Value:
 --*/
 {
 	// TODO: Implement
+	ULONG ChunkSize;
+	HANDLE FileIn;
+	PFILE_DATA SrcFileData;
+	ULONG i;
+	ULONG j;
+	ULONG NumFiles;
+	ULONG CurrentPos;
+
+	// variables for insertion sort
+	FILE_DATA ValueToInsert;
+	ULONG HolePos;
+
+	ChunkSize = BufferSize;
+
+	// See how many files there are
+	for (i = 0, NumFiles = 0; SrcDst[i] != NULL; i++) {
+		NumFiles++;
+	}
+
+	// malloc space for keeping track of files
+	SrcFileData = (PFILE_DATA) malloc(sizeof(FILE_DATA) * NumFiles);
+
+	// open each file source
+	// record sizes
+	// record data in SrcFileData
+	// keep track of how many total chunks we need
+	*NumChunks = 0;
+	for (i = 0; SrcDst[i] != NULL; i++) {
+		FileIn = CreateFile(SrcDst[i][SRC], GENERIC_READ, FILE_SHARE_READ, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
+		SrcFileData[i].filename = SrcDst[i][SRC];
+		SrcFileData[i].size = GetFileSize(FileIn, NULL);
+		(*NumChunks) += SrcFileData[i].size / ChunkSize;
+		if ((SrcFileData[i].size % ChunkSize) > 0) {
+			(*NumChunks)++;
+		}
+	}
+
+	// sort by sizes
+	// insertion sort
+	for (i = 1; i < NumFiles; i++) {
+		ValueToInsert = SrcFileData[i];
+		HolePos = i;
+		while (HolePos > 0 && ValueToInsert.size < SrcFileData[HolePos - 1].size) {
+			SrcFileData[HolePos] = SrcFileData[HolePos - 1];
+			HolePos--;
+		}
+		SrcFileData[HolePos] = ValueToInsert;
+	}
+
+	// create chunks of the files in order
+	(*Chunks) = (PFILE_CHUNK) malloc(sizeof(FILE_CHUNK) * (*NumChunks));
+
+	// loop through each file
+	for (i = 0, j = 0; i < NumFiles; i++) {
+		// start at begining
+		CurrentPos = 0;
+		// while we can make another full chunk
+		while ((CurrentPos + ChunkSize) < SrcFileData[i].size) {
+			(*Chunks)[j].filename = SrcFileData[i].filename;
+			(*Chunks)[j].start = CurrentPos;
+			(*Chunks)[j].length = ChunkSize;
+			CurrentPos += ChunkSize;
+			j++;
+		}
+		// make partial chunk
+		(*Chunks)[j].filename = SrcFileData[i].filename;
+		(*Chunks)[j].start = CurrentPos;
+		(*Chunks)[j].length = SrcFileData[i].size - CurrentPos;
+		j++;
+	}
+	
+
 	return ERROR_SUCCESS;
 }
