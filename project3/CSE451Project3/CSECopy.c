@@ -419,7 +419,7 @@ Return Value:
 						curr->ovlp.OffsetHigh = curr->chunk->start + curr->chunk->length;	
 						curr->ovlp.hEvent = events[FinishedEvent];
 			
-						WriteFile(FilesOut[curr->chunk->index], buffers[FinishedEvent], curr->chunk->length, NULL, &(curr->ovlp));
+						ReadFile(FilesOut[curr->chunk->index], buffers[FinishedEvent], curr->chunk->length, NULL, &(curr->ovlp));
 					} else {
 						//insert a dummy event that will never be signaled
 						events[FinishedEvent] = CreateEvent(NULL, TRUE, FALSE, NULL);
