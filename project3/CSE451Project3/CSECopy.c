@@ -266,33 +266,172 @@ Return Value:
 				- if read, call write
 				- if write, get next job
 	*/
-	ULONG i;
-	PCHAR buffer;
-	HANDLE FileIn;
-	HANDLE FileOut;
-	ULONG BytesInUseRead = BufferSize;
-	ULONG BytesInUseWrite = BufferSize;
-	BOOL Return;
+	ULONG i, NumChunks;
+	DWORD FinishedEvent;
+	ULONG NumFiles = 0;
+	ULONG processed = 0;
+	ULONG finished = 0;
+	ULONG read;
 
-	buffer = (PCHAR) malloc(BufferSize);
+	PWCHAR * buffers;
+	PFILE_CHUNK Chunks;
+	LPHANDLE FilesIn;
+	LPHANDLE FilesOut;
+	PASYNC_JOB aios;
+	LPHANDLE events;
+	PASYNC_JOB curr;
+
 	printf("CSE451MtCopyAsync(%d, %d, %08x, %d)\n", ThreadCount, BufferSize, SrcDst, Verbose);
 
 	for (i = 0; SrcDst[i] != NULL; i++) {
+		NumFiles++;
 		printf("SrcDst[%d] = %08x => %08x, %08x => \"%S\" \"%S\"\n", i, SrcDst[i], SrcDst[i][0], SrcDst[i][1], SrcDst[i][SRC], SrcDst[i][DST]);
 	}
 
-	FileIn = CreateFile(SrcDst[0][SRC], GENERIC_READ, 7, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
-	printf("FileIn is NULL? %d\n", FileIn == NULL);
-	FileOut = CreateFile(SrcDst[0][DST], GENERIC_WRITE, 7, NULL, CREATE_NEW, FILE_ATTRIBUTE_NORMAL, NULL);
-	printf("FileOut is NULL? %d\n", FileOut == NULL);
-	while(BytesInUseRead > 0) {
-		Return = ReadFile(FileIn, buffer, BufferSize, &BytesInUseRead, NULL);
-		BytesInUseWrite = BytesInUseRead;
-		Return = WriteFile(FileOut, buffer, BytesInUseRead, &BytesInUseWrite, NULL);
+	//allocate an array of file handles to all the file src
+	//allocate an array of file handles to all the file dst
+	FilesIn = (LPHANDLE) malloc(sizeof(HANDLE) * NumFiles);
+	FilesOut = (LPHANDLE) malloc(sizeof(HANDLE) * NumFiles);
+	for(i = 0; i < NumFiles; i++){
+		FilesIn[i] = CreateFile(SrcDst[0][SRC], GENERIC_READ, 7, NULL, OPEN_EXISTING, FILE_FLAG_OVERLAPPED, NULL);
+		FilesOut[i] = CreateFile(SrcDst[0][DST], GENERIC_WRITE, 7, NULL, CREATE_NEW, FILE_FLAG_OVERLAPPED, NULL);
 	}
-	CloseHandle(FileIn);
-	CloseHandle(FileOut);
-	free(buffer);
+
+	//allocate <ThreadCount> number of buffers each with size BufferSize
+	buffers = (PWCHAR *) malloc(sizeof(PWCHAR) * ThreadCount);
+	for(i = 0; i < BufferSize; i++){
+		buffers[i] = (PWCHAR) malloc(sizeof(WCHAR) * BufferSize);	
+	}
+
+	//allocate async_job object
+	aios = (PASYNC_JOB) malloc(sizeof(ASYNC_JOB) * ThreadCount);
+	memset(aios,0,sizeof(ASYNC_JOB) * ThreadCount);
+
+	//allocate events
+	/*
+		Buffers[i] is used by async job aios[i] with an event events[i]
+		Need to update them correspondingly
+	*/
+	events = (LPHANDLE) malloc(sizeof(HANDLE) * ThreadCount);
+
+	//parse the files into chunks
+	ParseAndChunk(BufferSize, SrcDst, Verbose, &Chunks, &NumChunks);
+
+	//start to read the first <ThreadCount> jobs
+	for(i = 0; i < ThreadCount; i++){
+		processed++;
+		aios[i].chunk = &(Chunks[i]);
+		aios[i].isread = TRUE;
+		aios[i].ovlp.Offset = Chunks[i].start;
+		aios[i].ovlp.OffsetHigh = Chunks[i].start + Chunks[i].length;
+		events[i] = CreateEvent(NULL, TRUE, FALSE, NULL);
+		aios[i].ovlp.hEvent = events[i];
+
+		ReadFile(FilesIn[i], buffers[i], Chunks[i].length, NULL, &(aios[i].ovlp));
+	}
+
+	
+	while(1){
+
+		//wait for an event to be signaled
+		FinishedEvent = WaitForMultipleObjects(ThreadCount, events, FALSE, INFINITE);
+
+		//TODO: error checking
+
+		CloseHandle(events[FinishedEvent]);
+		
+		curr = &aios[FinishedEvent];
+
+		curr->hasRead += curr->ovlp.InternalHigh;
+
+		if(curr->isread) {
+			//the event is a readfile event
+
+			if(curr->hasRead < curr->chunk->length){
+				//if the read hasn't finished the entire chunk, create another read event to finish the rest of the chunk
+
+				events[FinishedEvent] = CreateEvent(NULL, TRUE, FALSE, NULL);
+
+				//reset the overlap
+				memset(&(curr->ovlp),0,sizeof(OVERLAPPED));
+				curr->isread = TRUE;
+				curr->ovlp.Offset = curr->chunk->start + curr->hasRead;
+				curr->ovlp.OffsetHigh = curr->chunk->start + curr->chunk->length;	
+				curr->ovlp.hEvent = events[FinishedEvent];
+				
+				ReadFile(FilesIn[curr->chunk->index], buffers[FinishedEvent] + curr->hasRead, curr->chunk->length - curr->hasRead, NULL, &(curr->ovlp));
+
+			} else {
+				//if all the this chunk has been read. write it to the dst
+
+
+				events[FinishedEvent] = CreateEvent(NULL, TRUE, FALSE, NULL);
+
+				//reset the overlap
+				memset(&(curr->ovlp),0,sizeof(OVERLAPPED));
+				curr->isread = FALSE;
+				curr->hasRead = 0;
+				curr->ovlp.Offset = curr->chunk->start;
+				curr->ovlp.OffsetHigh = curr->chunk->start + curr->chunk->length;	
+				curr->ovlp.hEvent = events[FinishedEvent];
+			
+				WriteFile(FilesOut[curr->chunk->index], buffers[FinishedEvent], curr->chunk->length, NULL, &(curr->ovlp));
+			
+			}
+		
+		
+		} else {
+			//the event is a WriteFileEvent
+			
+			if(curr->hasRead < curr->chunk->length){
+				//write hasn't finished the current chunk
+
+				events[FinishedEvent] = CreateEvent(NULL, TRUE, FALSE, NULL);
+
+				//reset the overlap
+				memset(&(curr->ovlp),0,sizeof(OVERLAPPED));
+				curr->isread = FALSE;
+				curr->ovlp.Offset = curr->chunk->start + curr->hasRead;
+				curr->ovlp.OffsetHigh = curr->chunk->start + curr->chunk->length;	
+				curr->ovlp.hEvent = events[FinishedEvent];
+				
+				WriteFile(FilesOut[curr->chunk->index], buffers[FinishedEvent] + curr->hasRead, curr->chunk->length - curr->hasRead, NULL, &(curr->ovlp));				
+		
+			} else {
+				//write has finished the current chunk then move to the next one
+			
+				finished++;
+
+				if(finished < NumChunks){
+
+					if(processed < NumChunks ){
+						//if there is a chunk that hasn't been processed
+
+						events[FinishedEvent] = CreateEvent(NULL, TRUE, FALSE, NULL);
+
+						//reset the overlap
+						memset(&(curr->ovlp),0,sizeof(OVERLAPPED));
+						curr->isread = TRUE;
+
+						curr->chunk = & Chunks[processed ++];
+						curr->hasRead = 0;
+						curr->ovlp.Offset = curr->chunk->start;
+						curr->ovlp.OffsetHigh = curr->chunk->start + curr->chunk->length;	
+						curr->ovlp.hEvent = events[FinishedEvent];
+			
+						WriteFile(FilesOut[curr->chunk->index], buffers[FinishedEvent], curr->chunk->length, NULL, &(curr->ovlp));
+					} else {
+						//insert a dummy event that will never be signaled
+						events[FinishedEvent] = CreateEvent(NULL, TRUE, FALSE, NULL);
+					}
+				} else {
+					break;
+				}
+			}
+		
+		}
+	}
+
 	return ERROR_SUCCESS;
 }
 
