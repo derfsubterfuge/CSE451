@@ -1,16 +1,12 @@
-﻿Build started 2/10/2013 11:19:49 PM.
+﻿Build started 2/11/2013 4:16:47 PM.
      1>Project "C:\Users\xinx\Desktop\git\project3\CSE451Project3\CSE451Project3.vcxproj" on node 2 (build target(s)).
-     1>PrepareForBuild:
-         Creating directory "C:\Users\xinx\Desktop\git\project3\Debug\".
-       InitializeBuildStatus:
+     1>InitializeBuildStatus:
          Creating "Debug\CSE451Project3.unsuccessfulbuild" because "AlwaysCreate" was specified.
        ClCompile:
-         c:\Program Files (x86)\Microsoft Visual Studio 10.0\VC\bin\CL.exe /c /ZI /nologo /W3 /WX- /Od /Oy- /D WIN32 /D _DEBUG /D _CONSOLE /D _UNICODE /D UNICODE /Gm /EHsc /RTC1 /MDd /GS /fp:precise /Zc:wchar_t /Zc:forScope /Yc"StdAfx.h" /Fp"Debug\CSE451Project3.pch" /Fo"Debug\\" /Fd"Debug\vc100.pdb" /Gd /TC /analyze- /errorReport:prompt stdafx.c
-         stdafx.c
+         All outputs are up-to-date.
          c:\Program Files (x86)\Microsoft Visual Studio 10.0\VC\bin\CL.exe /c /ZI /nologo /W3 /WX- /Od /Oy- /D WIN32 /D _DEBUG /D _CONSOLE /D _UNICODE /D UNICODE /Gm /EHsc /RTC1 /MDd /GS /fp:precise /Zc:wchar_t /Zc:forScope /Yu"StdAfx.h" /Fp"Debug\CSE451Project3.pch" /Fo"Debug\\" /Fd"Debug\vc100.pdb" /Gd /TC /analyze- /errorReport:prompt CSE451Project3.c CSECopy.c
          CSECopy.c
      1>c:\users\xinx\desktop\git\project3\cse451project3\csecopy.c(44): warning C4101: 'FileInName' : unreferenced local variable
-     1>c:\users\xinx\desktop\git\project3\cse451project3\csecopy.c(274): warning C4101: 'read' : unreferenced local variable
          CSE451Project3.c
      1>c:\users\xinx\desktop\git\project3\cse451project3\cse451project3.c(188): warning C4996: 'wcscpy': This function or variable may be unsafe. Consider using wcscpy_s instead. To disable deprecation, use _CRT_SECURE_NO_WARNINGS. See online help for details.
                  c:\program files (x86)\microsoft visual studio 10.0\vc\include\wchar.h(988) : see declaration of 'wcscpy'
@@ -18,7 +14,7 @@
                  c:\program files (x86)\microsoft visual studio 10.0\vc\include\wchar.h(988) : see declaration of 'wcscpy'
          Generating Code...
        ManifestResourceCompile:
-         C:\Program Files (x86)\Microsoft SDKs\Windows\v7.0A\bin\rc.exe /nologo /fo"Debug\CSE451Project3.exe.embed.manifest.res" Debug\CSE451Project3_manifest.rc 
+         All outputs are up-to-date.
      1>C:\Program Files (x86)\MSBuild\Microsoft.Cpp\v4.0\Microsoft.CppBuild.targets(990,5): warning MSB8012: TargetPath(C:\Users\xinx\Desktop\git\project3\Debug\CSE451Project3.exe) does not match the Linker's OutputFile property value (C:\Users\xinx\Desktop\git\project3\Debug\mtcopy.exe). This may cause your project to build incorrectly. To correct this, please make sure that $(OutDir), $(TargetName) and $(TargetExt) property values match the value specified in %(Link.OutputFile).
      1>C:\Program Files (x86)\MSBuild\Microsoft.Cpp\v4.0\Microsoft.CppBuild.targets(992,5): warning MSB8012: TargetName(CSE451Project3) does not match the Linker's OutputFile property value (mtcopy). This may cause your project to build incorrectly. To correct this, please make sure that $(OutDir), $(TargetName) and $(TargetExt) property values match the value specified in %(Link.OutputFile).
        Link:
@@ -27,17 +23,11 @@
          Debug\CSECopy.obj
          Debug\stdafx.obj
          wsetargv.obj
-     1>wsetargv.obj : warning LNK4099: PDB 'libcmt.pdb' was not found with 'wsetargv.obj' or at 'C:\Users\xinx\Desktop\git\project3\Debug\libcmt.pdb'; linking object as if no debug info
        Manifest:
          C:\Program Files (x86)\Microsoft SDKs\Windows\v7.0A\bin\mt.exe /nologo /verbose /out:"Debug\CSE451Project3.exe.embed.manifest" /manifest Debug\CSE451Project3.exe.intermediate.manifest
-         C:\Program Files (x86)\Microsoft SDKs\Windows\v7.0A\bin\rc.exe /nologo /fo"Debug\CSE451Project3.exe.embed.manifest.res" Debug\CSE451Project3_manifest.rc 
+         All outputs are up-to-date.
        LinkEmbedManifest:
-         c:\Program Files (x86)\Microsoft Visual Studio 10.0\VC\bin\link.exe /ERRORREPORT:PROMPT /OUT:"C:\Users\xinx\Desktop\git\project3\Debug\mtcopy.exe" /INCREMENTAL /NOLOGO kernel32.lib user32.lib gdi32.lib winspool.lib comdlg32.lib advapi32.lib shell32.lib ole32.lib oleaut32.lib uuid.lib odbc32.lib odbccp32.lib /MANIFEST /ManifestFile:"Debug\CSE451Project3.exe.intermediate.manifest" /MANIFESTUAC:"level='asInvoker' uiAccess='false'" /DEBUG /PDB:"C:\Users\xinx\Desktop\git\project3\Debug\CSE451Project3.pdb" /SUBSYSTEM:CONSOLE /TLBID:1 /DYNAMICBASE:NO /IMPLIB:"C:\Users\xinx\Desktop\git\project3\Debug\CSE451Project3.lib" /MACHINE:X86 Debug\CSE451Project3.exe.embed.manifest.res
-         Debug\CSE451Project3.obj
-         Debug\CSECopy.obj
-         Debug\stdafx.obj
-         wsetargv.obj
-     1>wsetargv.obj : warning LNK4099: PDB 'libcmt.pdb' was not found with 'wsetargv.obj' or at 'C:\Users\xinx\Desktop\git\project3\Debug\libcmt.pdb'; linking object as if no debug info
+         All outputs are up-to-date.
          CSE451Project3.vcxproj -> C:\Users\xinx\Desktop\git\project3\Debug\CSE451Project3.exe
        FinalizeBuildStatus:
          Deleting file "Debug\CSE451Project3.unsuccessfulbuild".
@@ -46,4 +36,4 @@
 
 Build succeeded.
 
-Time Elapsed 00:00:01.95
+Time Elapsed 00:00:06.05

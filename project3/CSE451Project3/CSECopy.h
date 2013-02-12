@@ -32,7 +32,6 @@ typedef struct _FILE_DATA {
 
 typedef struct _ASYNC_JOB {
 	BOOL isread;
-	ULONG read; //used for InternalHigh entry in OVERLAPPED structure
 	ULONG hasRead;
 	PFILE_CHUNK chunk;
 	OVERLAPPED ovlp;
