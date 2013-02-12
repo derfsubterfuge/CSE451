@@ -18,7 +18,11 @@ Abstract:
 #define SRC 0
 #define DST 1
 
+//max number of threads is 8
 #define MAX_THREADS 8
+
+//max buffer size is 16MB
+#define MAX_BUFFER_SIZE (16*1024*1024)
 
 // Declaration of printError()
 VOID PrintError();
@@ -38,11 +42,13 @@ DWORD WINAPI ThreadCopy(
 {
 	PCOPY_THREAD_DATA cThreadData = (PCOPY_THREAD_DATA)threadData;
 	PCHAR Buffer = (PCHAR)malloc(cThreadData->BufferSize);
-	DWORD BytesRead;
-	DWORD BytesWrite;
-	HANDLE FileIn;
-	PWCHAR FileInName;
-	HANDLE FileOut;
+	DWORD BytesRead = 0;
+	DWORD BytesWrite = 0;
+	DWORD Temp;
+	HANDLE FileIn = NULL;
+	PWCHAR FileInName = NULL;
+	HANDLE FileOut = NULL;
+	PWCHAR FileOutName = NULL;
 	ULONG i;
 
 	while(TRUE) {
@@ -56,41 +62,71 @@ DWORD WINAPI ThreadCopy(
 		if(i >= cThreadData->NumChunks)
 			break;
 
-		FileIn = CreateFile(
-			cThreadData->Chunks[i].src,
-			GENERIC_READ,
-			7,
-			NULL,
-			OPEN_EXISTING,
-			FILE_ATTRIBUTE_NORMAL,
-			NULL);
+		if(FileInName != cThreadData->Chunks[i].src) {
+			if(FileIn != NULL)
+				CloseHandle(FileIn);
+			
+			FileInName = cThreadData->Chunks[i].src;
+			FileIn = CreateFile(
+				FileInName,
+				GENERIC_READ,
+				7,
+				NULL,
+				OPEN_EXISTING,
+				FILE_ATTRIBUTE_NORMAL,
+				NULL);
+				//TODO: check for error
+		}
 
-		FileOut = CreateFile(
-			cThreadData->Chunks[i].dst,
-			GENERIC_WRITE,
-			7,
-			NULL,
-			OPEN_EXISTING,
-			FILE_ATTRIBUTE_NORMAL,
-			NULL);
-
-		//TODO: keep track of which file we are on... if we already have same file open, then reuse it
+		if(FileOutName != cThreadData->Chunks[i].dst) {
+			if(FileOut != NULL)
+				CloseHandle(FileOut);
+				
+			FileOutName = cThreadData->Chunks[i].dst;
+			FileOut = CreateFile(
+				FileOutName,
+				GENERIC_WRITE,
+				7,
+				NULL,
+				OPEN_EXISTING,
+				FILE_ATTRIBUTE_NORMAL,
+				NULL);
+			 //TODO: check for error
+		}
 
 		SetFilePointer(FileIn, /*TODO: convert to LONG from ULONG*/ (LONG)cThreadData->Chunks[i].start, NULL, FILE_BEGIN);
 		SetFilePointer(FileOut, /*TODO: convert to LONG from ULONG*/ (LONG)cThreadData->Chunks[i].start, NULL, FILE_BEGIN);
-
-		ReadFile(FileIn, Buffer, cThreadData->Chunks[i].length, &BytesRead, NULL);
-		WriteFile(FileOut, Buffer, cThreadData->Chunks[i].length, &BytesWrite, NULL); //TODO: fix to incorporate actual bytes read and written
-
-		CloseHandle(FileIn);
-		CloseHandle(FileOut);
-
+		
+		BytesRead = 0;
+		while(BytesRead < cThreadData->Chunks[i].length) {
+			ReadFile(FileIn, Buffer+BytesRead, cThreadData->Chunks[i].length-BytesRead, &Temp, NULL);
+			//TODO: check for error
+			BytesRead += Temp;
+			printf("read: %d, temp: %d, length: %d\n",BytesRead, Temp, cThreadData->Chunks[i].length);
+		}
+		
+		BytesWrite = 0;
+		while(BytesWrite < cThreadData->Chunks[i].length) {
+			WriteFile(FileOut, Buffer+BytesWrite, cThreadData->Chunks[i].length-BytesWrite, &Temp, NULL); 
+			//TODO: check for error
+			BytesWrite += Temp;
+			printf("write: %d, temp: %d, length: %d\n",BytesWrite, Temp, cThreadData->Chunks[i].length);
+		}
+		
 		printf("Chunk %d\n", i);
 		printf("\tSrcName: %S\n", cThreadData->Chunks[i].src);
+		printf("\tSrcName: %S\n", FileInName);
 		printf("\tDstName: %S\n", cThreadData->Chunks[i].dst);
+		printf("\tDstName: %S\n", FileOutName);
 		printf("\tStart: %d\n", cThreadData->Chunks[i].start);
 		printf("\tLength: %d\n", cThreadData->Chunks[i].length);
 	}
+	
+	if(FileIn != NULL)
+		CloseHandle(FileIn);
+	if(FileOut != NULL)
+		CloseHandle(FileOut);
+		
 	/*while((i = *(cThreadData->NextChunk)) < cThreadData->NumChunks) {
 		(*(cThreadData->NextChunk))++;
 		printf("Chunk %d\n", i);
@@ -159,6 +195,10 @@ Return Value:
 
 	printf("CSE451MtCopy(%d, %d, %08x, %d)\n", ThreadCount, BufferSize, SrcDst, Verbose);
 
+
+	if(BufferSize > MAX_BUFFER_SIZE)
+		BufferSize = MAX_BUFFER_SIZE;
+
 	ParseAndChunk(BufferSize, SrcDst, Verbose, &Chunks, &NumChunks);
 
 	/*for (i = 0; i < NumChunks; i++) {
@@ -177,8 +217,6 @@ Return Value:
 		ThreadCount = MAX_THREADS;
 	if(ThreadCount > NumChunks)
 		ThreadCount = NumChunks;
-
-	//TODO: add max buffer size
 
 	ThreadData = (PCOPY_THREAD_DATA)malloc(sizeof(COPY_THREAD_DATA)*ThreadCount);
 	ThreadIDs = (PULONG)malloc(sizeof(ULONG)*ThreadCount);
@@ -219,7 +257,6 @@ Return Value:
 
 	return ERROR_SUCCESS;
 }
-
 
 
 ULONG CSE451MtCopyAsync (
@@ -594,7 +631,7 @@ Return Value:
 		Private helper function.
 */
 VOID
-printError() {
+PrintError() {
 	LPVOID lpMsgBuf;
 	FormatMessage( 
 		FORMAT_MESSAGE_ALLOCATE_BUFFER | 
