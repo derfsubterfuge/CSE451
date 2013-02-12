@@ -271,7 +271,7 @@ Return Value:
 	ULONG NumFiles = 0;
 	ULONG processed = 0;
 	ULONG finished = 0;
-	ULONG read;
+	DWORD BytesRW = 0;
 
 	PWCHAR * buffers;
 	PFILE_CHUNK Chunks;
@@ -342,10 +342,19 @@ Return Value:
 		
 		curr = &aios[FinishedEvent];
 
-		curr->hasRead += curr->ovlp.InternalHigh;
+
 
 		if(curr->isread) {
 			//the event is a readfile event
+
+			if(GetOverlappedResult(FilesIn[curr->chunk->index], 
+									&curr->ovlp,
+									&BytesRW,
+									FALSE))
+			{
+					curr->hasRead += BytesRW;
+					BytesRW = 0;
+			}
 
 			if(curr->hasRead < curr->chunk->length){
 				//if the read hasn't finished the entire chunk, create another read event to finish the rest of the chunk
@@ -382,6 +391,18 @@ Return Value:
 		
 		} else {
 			//the event is a WriteFileEvent
+
+			//get the number of bytes written
+			if(GetOverlappedResult(FilesOut[curr->chunk->index], 
+								&curr->ovlp,
+								&BytesRW,
+								FALSE))
+			{
+				curr->hasRead += BytesRW;
+				BytesRW = 0;
+			}
+
+
 			
 			if(curr->hasRead < curr->chunk->length){
 				//write hasn't finished the current chunk
@@ -419,7 +440,7 @@ Return Value:
 						curr->ovlp.OffsetHigh = curr->chunk->start + curr->chunk->length;	
 						curr->ovlp.hEvent = events[FinishedEvent];
 			
-						ReadFile(FilesOut[curr->chunk->index], buffers[FinishedEvent], curr->chunk->length, NULL, &(curr->ovlp));
+						ReadFile(FilesIn[curr->chunk->index], buffers[FinishedEvent], curr->chunk->length, NULL, &(curr->ovlp));
 					} else {
 						//insert a dummy event that will never be signaled
 						events[FinishedEvent] = CreateEvent(NULL, TRUE, FALSE, NULL);
