@@ -330,8 +330,8 @@ Return Value:
 	FilesIn = (LPHANDLE) malloc(sizeof(HANDLE) * NumFiles);
 	FilesOut = (LPHANDLE) malloc(sizeof(HANDLE) * NumFiles);
 	for(i = 0; i < NumFiles; i++){
-		FilesIn[i] = CreateFile(SrcDst[0][SRC], GENERIC_READ, 7, NULL, OPEN_EXISTING, FILE_FLAG_OVERLAPPED, NULL);
-		FilesOut[i] = CreateFile(SrcDst[0][DST], GENERIC_WRITE, 7, NULL, CREATE_NEW, FILE_FLAG_OVERLAPPED, NULL);
+		FilesIn[i] = CreateFile(SrcDst[i][SRC], GENERIC_READ, 7, NULL, OPEN_EXISTING, FILE_FLAG_OVERLAPPED, NULL);
+		FilesOut[i] = CreateFile(SrcDst[i][DST], GENERIC_WRITE, 7, NULL, CREATE_NEW, FILE_FLAG_OVERLAPPED, NULL);
 	}
 
 	//parse the files into chunks
@@ -579,6 +579,7 @@ Return Value:
 		FileIn = CreateFile(SrcDst[i][SRC], GENERIC_READ, FILE_SHARE_READ, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
 		SrcDstFileData[i].src = SrcDst[i][SRC];
 		SrcDstFileData[i].dst = SrcDst[i][DST];
+		SrcDstFileData[i].index = i;
 		SrcDstFileData[i].size = GetFileSize(FileIn, NULL); //TODO: handle large file sizes (second argument)
 		(*NumChunks) += SrcDstFileData[i].size / ChunkSize;
 		if ((SrcDstFileData[i].size % ChunkSize) > 0) {
@@ -616,7 +617,7 @@ Return Value:
 		while ((CurrentPos + ChunkSize) < SrcDstFileData[i].size) {
 			(*Chunks)[j].src = SrcDstFileData[i].src;
 			(*Chunks)[j].dst = SrcDstFileData[i].dst;
-			(*Chunks)[j].index = i;
+			(*Chunks)[j].index = SrcDstFileData[i].index;
 			(*Chunks)[j].start = CurrentPos;
 			(*Chunks)[j].length = ChunkSize;
 			CurrentPos += ChunkSize;
@@ -625,7 +626,7 @@ Return Value:
 		// make partial chunk
 		(*Chunks)[j].src = SrcDstFileData[i].src;
 		(*Chunks)[j].dst = SrcDstFileData[i].dst;
-		(*Chunks)[j].index = i;
+		(*Chunks)[j].index = SrcDstFileData[i].index;
 		(*Chunks)[j].start = CurrentPos;
 		(*Chunks)[j].length = SrcDstFileData[i].size - CurrentPos;
 		j++;

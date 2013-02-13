@@ -27,6 +27,7 @@ typedef struct _FILE_CHUNK {
 typedef struct _FILE_DATA {
 	PWCHAR src;
 	PWCHAR dst;
+	ULONG index;
 	ULONG size;
 } FILE_DATA, *PFILE_DATA;
 
