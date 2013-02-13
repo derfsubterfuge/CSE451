@@ -29,9 +29,9 @@ VOID PrintError();
 
 typedef struct _COPY_THREAD_DATA {
 	PFILE_CHUNK Chunks;
-	PULONG NextChunk;
+	ULONG NextChunk;
 	ULONG NumChunks;
-	PHANDLE Mutex;
+	HANDLE Mutex;
 	ULONG BufferSize;
 } COPY_THREAD_DATA, * PCOPY_THREAD_DATA;
 
@@ -52,13 +52,12 @@ DWORD WINAPI ThreadCopy(
 	ULONG i;
 
 	while(TRUE) {
-		WaitForSingleObject(*(cThreadData->Mutex), INFINITE);
+		WaitForSingleObject(cThreadData->Mutex, INFINITE);
 		
-		i = *(cThreadData->NextChunk);
-		(*(cThreadData->NextChunk))++;
+		i = cThreadData->NextChunk++;
 		
-		ReleaseMutex(*(cThreadData->Mutex));
-
+		ReleaseMutex(cThreadData->Mutex);
+		
 		if(i >= cThreadData->NumChunks)
 			break;
 
@@ -76,6 +75,7 @@ DWORD WINAPI ThreadCopy(
 				FILE_ATTRIBUTE_NORMAL,
 				NULL);
 				//TODO: check for error
+			//PrintError();
 		}
 
 		if(FileOutName != cThreadData->Chunks[i].dst) {
@@ -92,8 +92,9 @@ DWORD WINAPI ThreadCopy(
 				FILE_ATTRIBUTE_NORMAL,
 				NULL);
 			 //TODO: check for error
+			//PrintError();
 		}
-
+		//return 0;
 		SetFilePointer(FileIn, /*TODO: convert to LONG from ULONG*/ (LONG)cThreadData->Chunks[i].start, NULL, FILE_BEGIN);
 		SetFilePointer(FileOut, /*TODO: convert to LONG from ULONG*/ (LONG)cThreadData->Chunks[i].start, NULL, FILE_BEGIN);
 		
@@ -102,7 +103,6 @@ DWORD WINAPI ThreadCopy(
 			ReadFile(FileIn, Buffer+BytesRead, cThreadData->Chunks[i].length-BytesRead, &Temp, NULL);
 			//TODO: check for error
 			BytesRead += Temp;
-			printf("read: %d, temp: %d, length: %d\n",BytesRead, Temp, cThreadData->Chunks[i].length);
 		}
 		
 		BytesWrite = 0;
@@ -110,31 +110,21 @@ DWORD WINAPI ThreadCopy(
 			WriteFile(FileOut, Buffer+BytesWrite, cThreadData->Chunks[i].length-BytesWrite, &Temp, NULL); 
 			//TODO: check for error
 			BytesWrite += Temp;
-			printf("write: %d, temp: %d, length: %d\n",BytesWrite, Temp, cThreadData->Chunks[i].length);
 		}
 		
-		printf("Chunk %d\n", i);
+		/*printf("Chunk %d\n", i);
 		printf("\tSrcName: %S\n", cThreadData->Chunks[i].src);
 		printf("\tSrcName: %S\n", FileInName);
 		printf("\tDstName: %S\n", cThreadData->Chunks[i].dst);
 		printf("\tDstName: %S\n", FileOutName);
 		printf("\tStart: %d\n", cThreadData->Chunks[i].start);
-		printf("\tLength: %d\n", cThreadData->Chunks[i].length);
+		printf("\tLength: %d\n", cThreadData->Chunks[i].length);*/
 	}
 	
 	if(FileIn != NULL)
 		CloseHandle(FileIn);
 	if(FileOut != NULL)
 		CloseHandle(FileOut);
-		
-	/*while((i = *(cThreadData->NextChunk)) < cThreadData->NumChunks) {
-		(*(cThreadData->NextChunk))++;
-		printf("Chunk %d\n", i);
-		printf("\tSrcName: %S\n", cThreadData->Chunks[i].src);
-		printf("\tDstName: %S\n", cThreadData->Chunks[i].dst);
-		printf("\tStart: %d\n", cThreadData->Chunks[i].start);
-		printf("\tLength: %d\n", cThreadData->Chunks[i].length);
-	}*/
 
 	return 0;
 }
@@ -190,7 +180,6 @@ Return Value:
 	PCOPY_THREAD_DATA ThreadData;
 	PHANDLE Threads;
 	PULONG ThreadIDs;
-	ULONG NextChunk;
 	HANDLE Mutex;
 
 	printf("CSE451MtCopy(%d, %d, %08x, %d)\n", ThreadCount, BufferSize, SrcDst, Verbose);
@@ -218,23 +207,23 @@ Return Value:
 	if(ThreadCount > NumChunks)
 		ThreadCount = NumChunks;
 
-	ThreadData = (PCOPY_THREAD_DATA)malloc(sizeof(COPY_THREAD_DATA) * ThreadCount);
+	ThreadData = (PCOPY_THREAD_DATA)malloc(sizeof(COPY_THREAD_DATA));
 	ThreadIDs = (PULONG)malloc(sizeof(ULONG) * ThreadCount);
 	Threads = (PHANDLE)malloc(sizeof(HANDLE) * ThreadCount);
-	Mutex = CreateMutex(NULL,FALSE,NULL);
+	
+	ThreadData->Mutex = CreateMutex(NULL,FALSE,NULL);
+	ThreadData->Chunks = Chunks;
+	ThreadData->NextChunk = 0;
+	ThreadData->BufferSize = BufferSize;
+	ThreadData->NumChunks = NumChunks;
 
-	NextChunk = 0;
 	for(i = 0; i < ThreadCount; i++) {
-		ThreadData[i].Chunks = Chunks;
-		ThreadData[i].NextChunk = &NextChunk;
-		ThreadData[i].NumChunks = NumChunks;
-		ThreadData[i].Mutex = &Mutex;
-		ThreadData[i].BufferSize = BufferSize;
+		
 		Threads[i] = CreateThread(
 					NULL, 
 					0, 
 					ThreadCopy,
-					&(ThreadData[i]),
+					ThreadData,
 					0,
 					&(ThreadIDs[i]));
 	}
