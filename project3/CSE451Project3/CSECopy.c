@@ -218,9 +218,9 @@ Return Value:
 	if(ThreadCount > NumChunks)
 		ThreadCount = NumChunks;
 
-	ThreadData = (PCOPY_THREAD_DATA)malloc(sizeof(COPY_THREAD_DATA)*ThreadCount);
-	ThreadIDs = (PULONG)malloc(sizeof(ULONG)*ThreadCount);
-	Threads = (PHANDLE)malloc(sizeof(HANDLE)*ThreadCount);
+	ThreadData = (PCOPY_THREAD_DATA)malloc(sizeof(COPY_THREAD_DATA) * ThreadCount);
+	ThreadIDs = (PULONG)malloc(sizeof(ULONG) * ThreadCount);
+	Threads = (PHANDLE)malloc(sizeof(HANDLE) * ThreadCount);
 	Mutex = CreateMutex(NULL,FALSE,NULL);
 
 	NextChunk = 0;
@@ -310,7 +310,7 @@ Return Value:
 	ULONG finished = 0;
 	DWORD BytesRW = 0;
 
-	PWCHAR * buffers;
+	PCHAR * buffers;
 	PFILE_CHUNK Chunks;
 	LPHANDLE FilesIn;
 	LPHANDLE FilesOut;
@@ -334,10 +334,16 @@ Return Value:
 		FilesOut[i] = CreateFile(SrcDst[0][DST], GENERIC_WRITE, 7, NULL, CREATE_NEW, FILE_FLAG_OVERLAPPED, NULL);
 	}
 
+	//parse the files into chunks
+	ParseAndChunk(BufferSize, SrcDst, Verbose, &Chunks, &NumChunks);
+
 	//allocate <ThreadCount> number of buffers each with size BufferSize
-	buffers = (PWCHAR *) malloc(sizeof(PWCHAR) * ThreadCount);
-	for(i = 0; i < BufferSize; i++){
-		buffers[i] = (PWCHAR) malloc(sizeof(WCHAR) * BufferSize);	
+	// set <ThreadCount> to min of NumChunks and <ThreadCount>
+	if (ThreadCount > NumChunks)
+		ThreadCount = NumChunks;
+	buffers = (PCHAR *) malloc(sizeof(PCHAR) * ThreadCount);
+	for(i = 0; i < ThreadCount; i++){
+		buffers[i] = (PCHAR) malloc(sizeof(CHAR) * BufferSize);	
 	}
 
 	//allocate async_job object
@@ -351,20 +357,16 @@ Return Value:
 	*/
 	events = (LPHANDLE) malloc(sizeof(HANDLE) * ThreadCount);
 
-	//parse the files into chunks
-	ParseAndChunk(BufferSize, SrcDst, Verbose, &Chunks, &NumChunks);
-
 	//start to read the first <ThreadCount> jobs
 	for(i = 0; i < ThreadCount; i++){
 		processed++;
 		aios[i].chunk = &(Chunks[i]);
 		aios[i].isread = TRUE;
 		aios[i].ovlp.Offset = Chunks[i].start;
-		aios[i].ovlp.OffsetHigh = Chunks[i].start + Chunks[i].length;
 		events[i] = CreateEvent(NULL, TRUE, FALSE, NULL);
 		aios[i].ovlp.hEvent = events[i];
 
-		ReadFile(FilesIn[i], buffers[i], Chunks[i].length, NULL, &(aios[i].ovlp));
+		ReadFile(FilesIn[aios[i].chunk->index], buffers[i], Chunks[i].length, NULL, &(aios[i].ovlp));
 	}
 
 	
@@ -402,7 +404,6 @@ Return Value:
 				memset(&(curr->ovlp),0,sizeof(OVERLAPPED));
 				curr->isread = TRUE;
 				curr->ovlp.Offset = curr->chunk->start + curr->hasRead;
-				curr->ovlp.OffsetHigh = curr->chunk->start + curr->chunk->length;	
 				curr->ovlp.hEvent = events[FinishedEvent];
 				
 				ReadFile(FilesIn[curr->chunk->index], buffers[FinishedEvent] + curr->hasRead, curr->chunk->length - curr->hasRead, NULL, &(curr->ovlp));
@@ -418,7 +419,6 @@ Return Value:
 				curr->isread = FALSE;
 				curr->hasRead = 0;
 				curr->ovlp.Offset = curr->chunk->start;
-				curr->ovlp.OffsetHigh = curr->chunk->start + curr->chunk->length;	
 				curr->ovlp.hEvent = events[FinishedEvent];
 			
 				WriteFile(FilesOut[curr->chunk->index], buffers[FinishedEvent], curr->chunk->length, NULL, &(curr->ovlp));
@@ -450,7 +450,6 @@ Return Value:
 				memset(&(curr->ovlp),0,sizeof(OVERLAPPED));
 				curr->isread = FALSE;
 				curr->ovlp.Offset = curr->chunk->start + curr->hasRead;
-				curr->ovlp.OffsetHigh = curr->chunk->start + curr->chunk->length;	
 				curr->ovlp.hEvent = events[FinishedEvent];
 				
 				WriteFile(FilesOut[curr->chunk->index], buffers[FinishedEvent] + curr->hasRead, curr->chunk->length - curr->hasRead, NULL, &(curr->ovlp));				
@@ -474,7 +473,6 @@ Return Value:
 						curr->chunk = & Chunks[processed ++];
 						curr->hasRead = 0;
 						curr->ovlp.Offset = curr->chunk->start;
-						curr->ovlp.OffsetHigh = curr->chunk->start + curr->chunk->length;	
 						curr->ovlp.hEvent = events[FinishedEvent];
 			
 						ReadFile(FilesIn[curr->chunk->index], buffers[FinishedEvent], curr->chunk->length, NULL, &(curr->ovlp));
@@ -490,8 +488,20 @@ Return Value:
 		}
 	}
 
+	free(FilesIn);
+	free(FilesOut);
+	for(i = 0; i < ThreadCount; i++){
+		free(buffers[i]);	
+	}
+	free(buffers);
+	free(aios);
+	free(events);
+
 	return ERROR_SUCCESS;
 }
+
+
+
 
 ULONG ParseAndChunk (
     ULONG BufferSize,
@@ -606,6 +616,7 @@ Return Value:
 		while ((CurrentPos + ChunkSize) < SrcDstFileData[i].size) {
 			(*Chunks)[j].src = SrcDstFileData[i].src;
 			(*Chunks)[j].dst = SrcDstFileData[i].dst;
+			(*Chunks)[j].index = i;
 			(*Chunks)[j].start = CurrentPos;
 			(*Chunks)[j].length = ChunkSize;
 			CurrentPos += ChunkSize;
@@ -614,6 +625,7 @@ Return Value:
 		// make partial chunk
 		(*Chunks)[j].src = SrcDstFileData[i].src;
 		(*Chunks)[j].dst = SrcDstFileData[i].dst;
+		(*Chunks)[j].index = i;
 		(*Chunks)[j].start = CurrentPos;
 		(*Chunks)[j].length = SrcDstFileData[i].size - CurrentPos;
 		j++;
