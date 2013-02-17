@@ -69,7 +69,7 @@ DWORD WINAPI ThreadCopy(
 			FileIn = CreateFile(
 				FileInName,
 				GENERIC_READ,
-				7,
+				FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE,
 				NULL,
 				OPEN_EXISTING,
 				FILE_ATTRIBUTE_NORMAL,
@@ -86,7 +86,7 @@ DWORD WINAPI ThreadCopy(
 			FileOut = CreateFile(
 				FileOutName,
 				GENERIC_WRITE,
-				7,
+				FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE,
 				NULL,
 				OPEN_EXISTING,
 				FILE_ATTRIBUTE_NORMAL,
@@ -293,10 +293,10 @@ Return Value:
 				- if write, get next job
 	*/
 	ULONG i, NumChunks;
-	DWORD FinishedEvent;
+	DWORD FinishedIndex;
 	ULONG NumFiles = 0;
-	ULONG processed = 0;
-	ULONG finished = 0;
+	ULONG NumProcessed = 0;
+	ULONG NumFinished = 0;
 	DWORD BytesRW = 0;
 
 	PCHAR * buffers;
@@ -319,8 +319,8 @@ Return Value:
 	FilesIn = (LPHANDLE) malloc(sizeof(HANDLE) * NumFiles);
 	FilesOut = (LPHANDLE) malloc(sizeof(HANDLE) * NumFiles);
 	for(i = 0; i < NumFiles; i++){
-		FilesIn[i] = CreateFile(SrcDst[i][SRC], GENERIC_READ, 7, NULL, OPEN_EXISTING, FILE_FLAG_OVERLAPPED, NULL);
-		FilesOut[i] = CreateFile(SrcDst[i][DST], GENERIC_WRITE, 7, NULL, CREATE_NEW, FILE_FLAG_OVERLAPPED, NULL);
+		FilesIn[i] = CreateFile(SrcDst[i][SRC], GENERIC_READ, FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE, NULL, OPEN_EXISTING, FILE_FLAG_OVERLAPPED, NULL);
+		FilesOut[i] = CreateFile(SrcDst[i][DST], GENERIC_WRITE, FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE, NULL, CREATE_NEW, FILE_FLAG_OVERLAPPED, NULL);
 	}
 
 	//parse the files into chunks
@@ -348,7 +348,7 @@ Return Value:
 
 	//start to read the first <ThreadCount> jobs
 	for(i = 0; i < ThreadCount; i++){
-		processed++;
+		NumProcessed++;
 		aios[i].chunk = &(Chunks[i]);
 		aios[i].isread = TRUE;
 		aios[i].ovlp.Offset = Chunks[i].start;
@@ -362,13 +362,13 @@ Return Value:
 	while(1){
 
 		//wait for an event to be signaled
-		FinishedEvent = WaitForMultipleObjects(ThreadCount, events, FALSE, INFINITE);
+		FinishedIndex = WaitForMultipleObjects(ThreadCount, events, FALSE, INFINITE);
 
 		//TODO: error checking
 
-		CloseHandle(events[FinishedEvent]);
+		CloseHandle(events[FinishedIndex]);
 		
-		curr = &aios[FinishedEvent];
+		curr = &aios[FinishedIndex];
 
 
 
@@ -380,37 +380,35 @@ Return Value:
 									&BytesRW,
 									FALSE))
 			{
-					curr->hasRead += BytesRW;
+					curr->bytesRW += BytesRW;
 					BytesRW = 0;
 			}
 
-			if(curr->hasRead < curr->chunk->length){
-				//if the read hasn't finished the entire chunk, create another read event to finish the rest of the chunk
+			if(curr->bytesRW < curr->chunk->length){
+				//if the read hasn't NumFinished the entire chunk, create another read event to finish the rest of the chunk
 
-				events[FinishedEvent] = CreateEvent(NULL, TRUE, FALSE, NULL);
+				events[FinishedIndex] = CreateEvent(NULL, TRUE, FALSE, NULL);
 
 				//reset the overlap
-				memset(&(curr->ovlp),0,sizeof(OVERLAPPED));
 				curr->isread = TRUE;
-				curr->ovlp.Offset = curr->chunk->start + curr->hasRead;
-				curr->ovlp.hEvent = events[FinishedEvent];
+				curr->ovlp.Offset = curr->chunk->start + curr->bytesRW;
+				curr->ovlp.hEvent = events[FinishedIndex];
 				
-				ReadFile(FilesIn[curr->chunk->index], buffers[FinishedEvent] + curr->hasRead, curr->chunk->length - curr->hasRead, NULL, &(curr->ovlp));
+				ReadFile(FilesIn[curr->chunk->index], buffers[FinishedIndex] + curr->bytesRW, curr->chunk->length - curr->bytesRW, NULL, &(curr->ovlp));
 
 			} else {
 				//if all the this chunk has been read. write it to the dst
 
 
-				events[FinishedEvent] = CreateEvent(NULL, TRUE, FALSE, NULL);
+				events[FinishedIndex] = CreateEvent(NULL, TRUE, FALSE, NULL);
 
 				//reset the overlap
-				memset(&(curr->ovlp),0,sizeof(OVERLAPPED));
 				curr->isread = FALSE;
-				curr->hasRead = 0;
+				curr->bytesRW = 0;
 				curr->ovlp.Offset = curr->chunk->start;
-				curr->ovlp.hEvent = events[FinishedEvent];
+				curr->ovlp.hEvent = events[FinishedIndex];
 			
-				WriteFile(FilesOut[curr->chunk->index], buffers[FinishedEvent], curr->chunk->length, NULL, &(curr->ovlp));
+				WriteFile(FilesOut[curr->chunk->index], buffers[FinishedIndex], curr->chunk->length, NULL, &(curr->ovlp));
 			
 			}
 		
@@ -424,50 +422,48 @@ Return Value:
 								&BytesRW,
 								FALSE))
 			{
-				curr->hasRead += BytesRW;
+				curr->bytesRW += BytesRW;
 				BytesRW = 0;
 			}
 
 
 			
-			if(curr->hasRead < curr->chunk->length){
-				//write hasn't finished the current chunk
+			if(curr->bytesRW < curr->chunk->length){
+				//write hasn't NumFinished the current chunk
 
-				events[FinishedEvent] = CreateEvent(NULL, TRUE, FALSE, NULL);
+				events[FinishedIndex] = CreateEvent(NULL, TRUE, FALSE, NULL);
 
 				//reset the overlap
-				memset(&(curr->ovlp),0,sizeof(OVERLAPPED));
 				curr->isread = FALSE;
-				curr->ovlp.Offset = curr->chunk->start + curr->hasRead;
-				curr->ovlp.hEvent = events[FinishedEvent];
+				curr->ovlp.Offset = curr->chunk->start + curr->bytesRW;
+				curr->ovlp.hEvent = events[FinishedIndex];
 				
-				WriteFile(FilesOut[curr->chunk->index], buffers[FinishedEvent] + curr->hasRead, curr->chunk->length - curr->hasRead, NULL, &(curr->ovlp));				
+				WriteFile(FilesOut[curr->chunk->index], buffers[FinishedIndex] + curr->bytesRW, curr->chunk->length - curr->bytesRW, NULL, &(curr->ovlp));				
 		
 			} else {
-				//write has finished the current chunk then move to the next one
+				//write has NumFinished the current chunk then move to the next one
 			
-				finished++;
+				NumFinished++;
 
-				if(finished < NumChunks){
+				if(NumFinished < NumChunks){
 
-					if(processed < NumChunks ){
-						//if there is a chunk that hasn't been processed
+					if(NumProcessed < NumChunks ){
+						//if there is a chunk that hasn't been NumProcessed
 
-						events[FinishedEvent] = CreateEvent(NULL, TRUE, FALSE, NULL);
+						events[FinishedIndex] = CreateEvent(NULL, TRUE, FALSE, NULL);
 
 						//reset the overlap
-						memset(&(curr->ovlp),0,sizeof(OVERLAPPED));
 						curr->isread = TRUE;
 
-						curr->chunk = & Chunks[processed ++];
-						curr->hasRead = 0;
+						curr->chunk = & Chunks[NumProcessed ++];
+						curr->bytesRW = 0;
 						curr->ovlp.Offset = curr->chunk->start;
-						curr->ovlp.hEvent = events[FinishedEvent];
+						curr->ovlp.hEvent = events[FinishedIndex];
 			
-						ReadFile(FilesIn[curr->chunk->index], buffers[FinishedEvent], curr->chunk->length, NULL, &(curr->ovlp));
+						ReadFile(FilesIn[curr->chunk->index], buffers[FinishedIndex], curr->chunk->length, NULL, &(curr->ovlp));
 					} else {
 						//insert a dummy event that will never be signaled
-						events[FinishedEvent] = CreateEvent(NULL, TRUE, FALSE, NULL);
+						events[FinishedIndex] = CreateEvent(NULL, TRUE, FALSE, NULL);
 					}
 				} else {
 					break;
@@ -566,6 +562,9 @@ Return Value:
 	for (i = 0; SrcDst[i] != NULL; i++) {
 		//TODO: handle doesn't exist
 		FileIn = CreateFile(SrcDst[i][SRC], GENERIC_READ, FILE_SHARE_READ, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
+		if (FileIn == INVALID_HANDLE_VALUE) {
+			PrintError();
+		}
 		SrcDstFileData[i].src = SrcDst[i][SRC];
 		SrcDstFileData[i].dst = SrcDst[i][DST];
 		SrcDstFileData[i].index = i;

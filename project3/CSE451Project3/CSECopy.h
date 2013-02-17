@@ -33,7 +33,7 @@ typedef struct _FILE_DATA {
 
 typedef struct _ASYNC_JOB {
 	BOOL isread;
-	ULONG hasRead;
+	ULONG bytesRW;
 	PFILE_CHUNK chunk;
 	OVERLAPPED ovlp;
 } ASYNC_JOB, *PASYNC_JOB;
