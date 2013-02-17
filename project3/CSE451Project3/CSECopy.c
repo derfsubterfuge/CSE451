@@ -645,7 +645,7 @@ Return Value:
 		//create destination files
 		//TODO: always overwrite?
 		//TODO: handle bad file path
-		FileOut = CreateFile(SrcDst[i][DST], GENERIC_WRITE, FILE_SHARE_WRITE, NULL, CREATE_NEW, FILE_ATTRIBUTE_NORMAL, NULL);
+		FileOut = CreateFile(SrcDst[i][DST], GENERIC_WRITE, FILE_SHARE_WRITE, NULL, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL);
 		if (FileOut == INVALID_HANDLE_VALUE) {
 			PrintError();
 			return GetLastError();
