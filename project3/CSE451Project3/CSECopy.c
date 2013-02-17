@@ -51,20 +51,27 @@ DWORD WINAPI ThreadCopy(
 	PWCHAR FileOutName = NULL;
 	ULONG i;
 
+	// keep copying until no more chunks to process 
 	while(TRUE) {
+		// get a lock on shared cThreadData
 		WaitForSingleObject(cThreadData->Mutex, INFINITE);
 		
 		i = cThreadData->NextChunk++;
 		
+		// release the lock
 		ReleaseMutex(cThreadData->Mutex);
 		
+		// if out of chunks then break
 		if(i >= cThreadData->NumChunks)
 			break;
 
+		// if we need to change in files for this job
 		if(FileInName != cThreadData->Chunks[i].src) {
+			// close the current file handle
 			if(FileIn != NULL)
 				CloseHandle(FileIn);
 			
+			// create a new file handle
 			FileInName = cThreadData->Chunks[i].src;
 			FileIn = CreateFile(
 				FileInName,
@@ -74,14 +81,21 @@ DWORD WINAPI ThreadCopy(
 				OPEN_EXISTING,
 				FILE_ATTRIBUTE_NORMAL,
 				NULL);
+			if (FileIn == INVALID_HANDLE_VALUE) {
+				PrintError();
+				return GetLastError();
+			}
 				//TODO: check for error
 			//PrintError();
 		}
 
+		// if we need to change out files for this job
 		if(FileOutName != cThreadData->Chunks[i].dst) {
+			// close the current file handle
 			if(FileOut != NULL)
 				CloseHandle(FileOut);
 				
+			// create a new file handle
 			FileOutName = cThreadData->Chunks[i].dst;
 			FileOut = CreateFile(
 				FileOutName,
@@ -91,23 +105,36 @@ DWORD WINAPI ThreadCopy(
 				OPEN_EXISTING,
 				FILE_ATTRIBUTE_NORMAL,
 				NULL);
+			if (FileOut == INVALID_HANDLE_VALUE) {
+				PrintError();
+				return GetLastError();
+			}
 			 //TODO: check for error
 			//PrintError();
 		}
-		//return 0;
+
+		// Set the file pointers
 		SetFilePointer(FileIn, /*TODO: convert to LONG from ULONG*/ (LONG)cThreadData->Chunks[i].start, NULL, FILE_BEGIN);
 		SetFilePointer(FileOut, /*TODO: convert to LONG from ULONG*/ (LONG)cThreadData->Chunks[i].start, NULL, FILE_BEGIN);
 		
+		// read the chunk
 		BytesRead = 0;
 		while(BytesRead < cThreadData->Chunks[i].length) {
-			ReadFile(FileIn, Buffer+BytesRead, cThreadData->Chunks[i].length-BytesRead, &Temp, NULL);
+			if	(ReadFile(FileIn, Buffer+BytesRead, cThreadData->Chunks[i].length-BytesRead, &Temp, NULL) == FALSE) {
+				PrintError();
+				return GetLastError();
+			}
 			//TODO: check for error
 			BytesRead += Temp;
 		}
 		
+		// write the chunk
 		BytesWrite = 0;
 		while(BytesWrite < cThreadData->Chunks[i].length) {
-			WriteFile(FileOut, Buffer+BytesWrite, cThreadData->Chunks[i].length-BytesWrite, &Temp, NULL); 
+			if (WriteFile(FileOut, Buffer+BytesWrite, cThreadData->Chunks[i].length-BytesWrite, &Temp, NULL) == FALSE) {
+				PrintError();
+				return GetLastError();
+			}
 			//TODO: check for error
 			BytesWrite += Temp;
 		}
@@ -121,12 +148,14 @@ DWORD WINAPI ThreadCopy(
 		printf("\tLength: %d\n", cThreadData->Chunks[i].length);*/
 	}
 	
+
+	// cleanup
 	if(FileIn != NULL)
 		CloseHandle(FileIn);
 	if(FileOut != NULL)
 		CloseHandle(FileOut);
 
-	return 0;
+	return ERROR_SUCCESS;
 }
 
 ULONG CSE451MtCopy (
@@ -182,13 +211,16 @@ Return Value:
 	PULONG ThreadIDs;
 	HANDLE Mutex;
 
-	printf("CSE451MtCopy(%d, %d, %08x, %d)\n", ThreadCount, BufferSize, SrcDst, Verbose);
+	// printf("CSE451MtCopy(%d, %d, %08x, %d)\n", ThreadCount, BufferSize, SrcDst, Verbose);
 
 
-	if(BufferSize > MAX_BUFFER_SIZE)
-		BufferSize = MAX_BUFFER_SIZE;
+	/*if(BufferSize > MAX_BUFFER_SIZE)
+		BufferSize = MAX_BUFFER_SIZE;*/
 
-	ParseAndChunk(BufferSize, SrcDst, Verbose, &Chunks, &NumChunks);
+	// parse the file into chunks
+	if (ParseAndChunk(BufferSize, SrcDst, Verbose, &Chunks, &NumChunks)) {
+		return GetLastError();
+	}
 
 	/*for (i = 0; i < NumChunks; i++) {
 		printf("Chunk %d\n", i);
@@ -202,23 +234,27 @@ Return Value:
 		printf("SrcDst[%d] = %08x => %08x, %08x => \"%S\" \"%S\"\n", i, SrcDst[i], SrcDst[i][SRC], SrcDst[i][DST], SrcDst[i][SRC], SrcDst[i][DST]);
 	}*/
 
-	if(ThreadCount > MAX_THREADS)
-		ThreadCount = MAX_THREADS;
+	/*if(ThreadCount > MAX_THREADS)
+		ThreadCount = MAX_THREADS;*/
+
+	// be smart about number of threads created
 	if(ThreadCount > NumChunks)
 		ThreadCount = NumChunks;
 
+	// malloc data for threads
 	ThreadData = (PCOPY_THREAD_DATA)malloc(sizeof(COPY_THREAD_DATA));
 	ThreadIDs = (PULONG)malloc(sizeof(ULONG) * ThreadCount);
 	Threads = (PHANDLE)malloc(sizeof(HANDLE) * ThreadCount);
 	
+	// initialize thread data
 	ThreadData->Mutex = CreateMutex(NULL,FALSE,NULL);
 	ThreadData->Chunks = Chunks;
 	ThreadData->NextChunk = 0;
 	ThreadData->BufferSize = BufferSize;
 	ThreadData->NumChunks = NumChunks;
 
+	// spawn threads
 	for(i = 0; i < ThreadCount; i++) {
-		
 		Threads[i] = CreateThread(
 					NULL, 
 					0, 
@@ -228,17 +264,20 @@ Return Value:
 					&(ThreadIDs[i]));
 	}
 
+	// wait for all threads to finish
 	WaitForMultipleObjects(
 		ThreadCount,
 		Threads,
 		TRUE,
 		INFINITE);
 
+	// close all threads
 	for(i = 0; i < ThreadCount; i++) {
-		printf("%d\n", ThreadIDs[i]);
+		//printf("%d\n", ThreadIDs[i]);
 		CloseHandle(Threads[i]);
 	}
 
+	// cleanup
 	free(Chunks);
 	free(ThreadData);
 	free(Threads);
@@ -307,11 +346,16 @@ Return Value:
 	LPHANDLE events;
 	PASYNC_JOB curr;
 
-	printf("CSE451MtCopyAsync(%d, %d, %08x, %d)\n", ThreadCount, BufferSize, SrcDst, Verbose);
+	//printf("CSE451MtCopyAsync(%d, %d, %08x, %d)\n", ThreadCount, BufferSize, SrcDst, Verbose);
 
 	for (i = 0; SrcDst[i] != NULL; i++) {
 		NumFiles++;
-		printf("SrcDst[%d] = %08x => %08x, %08x => \"%S\" \"%S\"\n", i, SrcDst[i], SrcDst[i][0], SrcDst[i][1], SrcDst[i][SRC], SrcDst[i][DST]);
+		//printf("SrcDst[%d] = %08x => %08x, %08x => \"%S\" \"%S\"\n", i, SrcDst[i], SrcDst[i][0], SrcDst[i][1], SrcDst[i][SRC], SrcDst[i][DST]);
+	}
+
+	//parse the files into chunks
+	if (ParseAndChunk(BufferSize, SrcDst, Verbose, &Chunks, &NumChunks)) {
+		return GetLastError();
 	}
 
 	//allocate an array of file handles to all the file src
@@ -320,11 +364,8 @@ Return Value:
 	FilesOut = (LPHANDLE) malloc(sizeof(HANDLE) * NumFiles);
 	for(i = 0; i < NumFiles; i++){
 		FilesIn[i] = CreateFile(SrcDst[i][SRC], GENERIC_READ, FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE, NULL, OPEN_EXISTING, FILE_FLAG_OVERLAPPED, NULL);
-		FilesOut[i] = CreateFile(SrcDst[i][DST], GENERIC_WRITE, FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE, NULL, CREATE_NEW, FILE_FLAG_OVERLAPPED, NULL);
+		FilesOut[i] = CreateFile(SrcDst[i][DST], GENERIC_WRITE, FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE, NULL, OPEN_EXISTING, FILE_FLAG_OVERLAPPED, NULL);
 	}
-
-	//parse the files into chunks
-	ParseAndChunk(BufferSize, SrcDst, Verbose, &Chunks, &NumChunks);
 
 	//allocate <ThreadCount> number of buffers each with size BufferSize
 	// set <ThreadCount> to min of NumChunks and <ThreadCount>
@@ -355,7 +396,12 @@ Return Value:
 		events[i] = CreateEvent(NULL, TRUE, FALSE, NULL);
 		aios[i].ovlp.hEvent = events[i];
 
-		ReadFile(FilesIn[aios[i].chunk->index], buffers[i], Chunks[i].length, NULL, &(aios[i].ovlp));
+		if (ReadFile(FilesIn[aios[i].chunk->index], buffers[i], Chunks[i].length, NULL, &(aios[i].ovlp)) == FALSE) {
+			if (GetLastError() != ERROR_IO_PENDING) {
+				PrintError();
+				return GetLastError();
+			}
+		}
 	}
 
 	
@@ -394,7 +440,12 @@ Return Value:
 				curr->ovlp.Offset = curr->chunk->start + curr->bytesRW;
 				curr->ovlp.hEvent = events[FinishedIndex];
 				
-				ReadFile(FilesIn[curr->chunk->index], buffers[FinishedIndex] + curr->bytesRW, curr->chunk->length - curr->bytesRW, NULL, &(curr->ovlp));
+				if (ReadFile(FilesIn[curr->chunk->index], buffers[FinishedIndex] + curr->bytesRW, curr->chunk->length - curr->bytesRW, NULL, &(curr->ovlp)) == FALSE) {
+					if (GetLastError() != ERROR_IO_PENDING) {
+						PrintError();
+						return GetLastError();
+					}
+				}
 
 			} else {
 				//if all the this chunk has been read. write it to the dst
@@ -408,7 +459,12 @@ Return Value:
 				curr->ovlp.Offset = curr->chunk->start;
 				curr->ovlp.hEvent = events[FinishedIndex];
 			
-				WriteFile(FilesOut[curr->chunk->index], buffers[FinishedIndex], curr->chunk->length, NULL, &(curr->ovlp));
+				if (WriteFile(FilesOut[curr->chunk->index], buffers[FinishedIndex], curr->chunk->length, NULL, &(curr->ovlp)) == FALSE) {
+					if (GetLastError() != ERROR_IO_PENDING) {
+						PrintError();
+						return GetLastError();
+					}
+				}
 			
 			}
 		
@@ -438,7 +494,12 @@ Return Value:
 				curr->ovlp.Offset = curr->chunk->start + curr->bytesRW;
 				curr->ovlp.hEvent = events[FinishedIndex];
 				
-				WriteFile(FilesOut[curr->chunk->index], buffers[FinishedIndex] + curr->bytesRW, curr->chunk->length - curr->bytesRW, NULL, &(curr->ovlp));				
+				if (WriteFile(FilesOut[curr->chunk->index], buffers[FinishedIndex] + curr->bytesRW, curr->chunk->length - curr->bytesRW, NULL, &(curr->ovlp)) == FALSE) {
+					if (GetLastError() != ERROR_IO_PENDING) {
+						PrintError();
+						return GetLastError();
+					}
+				}
 		
 			} else {
 				//write has NumFinished the current chunk then move to the next one
@@ -460,7 +521,12 @@ Return Value:
 						curr->ovlp.Offset = curr->chunk->start;
 						curr->ovlp.hEvent = events[FinishedIndex];
 			
-						ReadFile(FilesIn[curr->chunk->index], buffers[FinishedIndex], curr->chunk->length, NULL, &(curr->ovlp));
+						if (ReadFile(FilesIn[curr->chunk->index], buffers[FinishedIndex], curr->chunk->length, NULL, &(curr->ovlp)) == FALSE) {
+							if (GetLastError() != ERROR_IO_PENDING) {
+								PrintError();
+								return GetLastError();
+							}
+						}
 					} else {
 						//insert a dummy event that will never be signaled
 						events[FinishedIndex] = CreateEvent(NULL, TRUE, FALSE, NULL);
@@ -564,8 +630,8 @@ Return Value:
 		FileIn = CreateFile(SrcDst[i][SRC], GENERIC_READ, FILE_SHARE_READ, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
 		if (FileIn == INVALID_HANDLE_VALUE) {
 			PrintError();
+			return GetLastError();
 		}
-
 		SrcDstFileData[i].src = SrcDst[i][SRC];
 		SrcDstFileData[i].dst = SrcDst[i][DST];
 		SrcDstFileData[i].index = i;
@@ -579,7 +645,11 @@ Return Value:
 		//create destination files
 		//TODO: always overwrite?
 		//TODO: handle bad file path
-		FileOut = CreateFile(SrcDst[i][DST], GENERIC_WRITE, FILE_SHARE_WRITE, NULL, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL);
+		FileOut = CreateFile(SrcDst[i][DST], GENERIC_WRITE, FILE_SHARE_WRITE, NULL, CREATE_NEW, FILE_ATTRIBUTE_NORMAL, NULL);
+		if (FileOut == INVALID_HANDLE_VALUE) {
+			PrintError();
+			return GetLastError();
+		}
 		CloseHandle(FileOut);
 	}
 
