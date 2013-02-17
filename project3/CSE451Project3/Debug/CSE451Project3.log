@@ -1,15 +1,15 @@
-﻿Build started 2/16/2013 9:50:01 PM.
+﻿Build started 2/17/2013 12:55:59 AM.
      1>Project "C:\Users\xinx\Desktop\git\project3\CSE451Project3\CSE451Project3.vcxproj" on node 2 (build target(s)).
      1>InitializeBuildStatus:
          Creating "Debug\CSE451Project3.unsuccessfulbuild" because "AlwaysCreate" was specified.
        ClCompile:
          All outputs are up-to-date.
-         c:\Program Files (x86)\Microsoft Visual Studio 10.0\VC\bin\CL.exe /c /ZI /nologo /W3 /WX- /Od /Oy- /D WIN32 /D _DEBUG /D _CONSOLE /D _UNICODE /D UNICODE /Gm /EHsc /RTC1 /MDd /GS /fp:precise /Zc:wchar_t /Zc:forScope /Yu"StdAfx.h" /Fp"Debug\CSE451Project3.pch" /Fo"Debug\\" /Fd"Debug\vc100.pdb" /Gd /TC /analyze- /errorReport:prompt CSE451Project3.c
-         CSE451Project3.c
-     1>c:\users\xinx\desktop\git\project3\cse451project3\cse451project3.c(194): warning C4996: 'wcscpy': This function or variable may be unsafe. Consider using wcscpy_s instead. To disable deprecation, use _CRT_SECURE_NO_WARNINGS. See online help for details.
-                 c:\program files (x86)\microsoft visual studio 10.0\vc\include\wchar.h(988) : see declaration of 'wcscpy'
-     1>c:\users\xinx\desktop\git\project3\cse451project3\cse451project3.c(203): warning C4996: 'wcscpy': This function or variable may be unsafe. Consider using wcscpy_s instead. To disable deprecation, use _CRT_SECURE_NO_WARNINGS. See online help for details.
-                 c:\program files (x86)\microsoft visual studio 10.0\vc\include\wchar.h(988) : see declaration of 'wcscpy'
+         c:\Program Files (x86)\Microsoft Visual Studio 10.0\VC\bin\CL.exe /c /ZI /nologo /W3 /WX- /Od /Oy- /D WIN32 /D _DEBUG /D _CONSOLE /D _UNICODE /D UNICODE /Gm /EHsc /RTC1 /MDd /GS /fp:precise /Zc:wchar_t /Zc:forScope /Yu"StdAfx.h" /Fp"Debug\CSE451Project3.pch" /Fo"Debug\\" /Fd"Debug\vc100.pdb" /Gd /TC /analyze- /errorReport:prompt CSECopy.c
+         CSECopy.c
+     1>c:\users\xinx\desktop\git\project3\cse451project3\csecopy.c(232): warning C4020: 'ParseAndChunk' : too many actual parameters
+     1>c:\users\xinx\desktop\git\project3\cse451project3\csecopy.c(213): warning C4101: 'Mutex' : unreferenced local variable
+     1>c:\users\xinx\desktop\git\project3\cse451project3\csecopy.c(388): warning C4020: 'ParseAndChunk' : too many actual parameters
+     1>c:\users\xinx\desktop\git\project3\cse451project3\csecopy.c(637): warning C4029: declared formal parameter list different from definition
        ManifestResourceCompile:
          All outputs are up-to-date.
      1>C:\Program Files (x86)\MSBuild\Microsoft.Cpp\v4.0\Microsoft.CppBuild.targets(990,5): warning MSB8012: TargetPath(C:\Users\xinx\Desktop\git\project3\Debug\CSE451Project3.exe) does not match the Linker's OutputFile property value (C:\Users\xinx\Desktop\git\project3\Debug\mtcopy.exe). This may cause your project to build incorrectly. To correct this, please make sure that $(OutDir), $(TargetName) and $(TargetExt) property values match the value specified in %(Link.OutputFile).
@@ -33,4 +33,4 @@
 
 Build succeeded.
 
-Time Elapsed 00:00:00.82
+Time Elapsed 00:00:00.49

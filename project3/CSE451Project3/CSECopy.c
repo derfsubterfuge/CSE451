@@ -206,6 +206,7 @@ Return Value:
 	ULONG i;
 	PFILE_CHUNK Chunks;
 	ULONG NumChunks;
+	ULONG NumBytes = 0;
 	PCOPY_THREAD_DATA ThreadData;
 	PHANDLE Threads;
 	PULONG ThreadIDs;
@@ -228,7 +229,7 @@ Return Value:
 		BufferSize = MAX_BUFFER_SIZE;*/
 
 	// parse the file into chunks
-	if (ParseAndChunk(BufferSize, SrcDst, Verbose, &Chunks, &NumChunks)) {
+	if (ParseAndChunk(BufferSize, SrcDst, Verbose, &Chunks, &NumChunks, &NumBytes)) {
 		return GetLastError();
 	}
 
@@ -299,7 +300,7 @@ Return Value:
 
 		ElapsedTimeIn100ns.QuadPart = EndFileTime.QuadPart - StartFileTime.QuadPart;
 
-		printf("ThreadCount = %d BufferSize = %d Elapsed Time in 100ns = %d\n", ThreadCount, BufferSize, ElapsedTimeIn100ns.QuadPart );
+		printf("ThreadCount = %d BufferSize = %d Elapsed Time in 100ns = %lld Throughput = %.2f MB/s \n", ThreadCount, BufferSize, ElapsedTimeIn100ns.QuadPart, (NumBytes * 10.0) / ElapsedTimeIn100ns.QuadPart);
 	}
 
 	return ERROR_SUCCESS;
@@ -351,6 +352,7 @@ Return Value:
 				- if write, get next job
 	*/
 	ULONG i, NumChunks;
+	ULONG NumBytes = 0;
 	DWORD FinishedIndex;
 	ULONG NumFiles = 0;
 	ULONG NumProcessed = 0;
@@ -383,7 +385,7 @@ Return Value:
 	}
 
 	//parse the files into chunks
-	if (ParseAndChunk(BufferSize, SrcDst, Verbose, &Chunks, &NumChunks)) {
+	if (ParseAndChunk(BufferSize, SrcDst, Verbose, &Chunks, &NumChunks, &NumBytes)) {
 		return GetLastError();
 	}
 
@@ -584,7 +586,7 @@ Return Value:
 
 		ElapsedTimeIn100ns.QuadPart = EndFileTime.QuadPart - StartFileTime.QuadPart;
 
-		printf("ThreadCount = %d BufferSize = %d Elapsed Time in 100ns = %d\n", ThreadCount, BufferSize, ElapsedTimeIn100ns.QuadPart );
+		printf("ThreadCount = %d BufferSize = %d Elapsed Time in 100ns = %lld Throughput = %.2f MB/s \n", ThreadCount, BufferSize, ElapsedTimeIn100ns.QuadPart, (NumBytes * 10.0) / ElapsedTimeIn100ns.QuadPart);
 	}
 
 	return ERROR_SUCCESS;
@@ -598,7 +600,8 @@ ULONG ParseAndChunk (
     PWCHAR *SrcDst[2],
     BOOLEAN Verbose,
 	PFILE_CHUNK * Chunks,
-    PULONG NumChunks
+    PULONG NumChunks,
+	PULONG NumBytes
     )
 
 /*++
@@ -663,6 +666,7 @@ Return Value:
 	// record data in SrcFileData
 	// keep track of how many total chunks we need
 	// create destination files
+	*NumBytes = 0;
 	*NumChunks = 0;
 	for (i = 0; SrcDst[i] != NULL; i++) {
 		//TODO: handle doesn't exist
@@ -675,6 +679,7 @@ Return Value:
 		SrcDstFileData[i].dst = SrcDst[i][DST];
 		SrcDstFileData[i].index = i;
 		SrcDstFileData[i].size = GetFileSize(FileIn, NULL); //TODO: handle large file sizes (second argument)
+		(*NumBytes)	+= SrcDstFileData[i].size;
 		(*NumChunks) += SrcDstFileData[i].size / ChunkSize;
 		if ((SrcDstFileData[i].size % ChunkSize) > 0) {
 			(*NumChunks)++;

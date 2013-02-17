@@ -209,6 +209,7 @@ Routine Description:
 	//	list the sources and destinations
 	//
 
+	
 	if (Verbose) {
 
 		for (i = 0; i < NumberOfSourceFiles; i++) {
@@ -216,6 +217,7 @@ Routine Description:
 			printf("SrcDst[%d] \"%S\" => \"%S\"\n", i, SrcDst[i][0], SrcDst[i][1]);
 		}
 	}
+	
 
 	//
 	//	Now call the copy routines to do the actual work
