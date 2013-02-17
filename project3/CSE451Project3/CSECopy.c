@@ -211,6 +211,16 @@ Return Value:
 	PULONG ThreadIDs;
 	HANDLE Mutex;
 
+	SYSTEMTIME SystemTime;
+	LARGE_INTEGER StartFileTime, EndFileTime;
+	LARGE_INTEGER ElapsedTimeIn100ns;
+
+	//get the starting time
+	if(Verbose){
+		GetSystemTime( &SystemTime );
+		SystemTimeToFileTime( &SystemTime, (PFILETIME)&StartFileTime );
+	}
+
 	// printf("CSE451MtCopy(%d, %d, %08x, %d)\n", ThreadCount, BufferSize, SrcDst, Verbose);
 
 
@@ -283,6 +293,15 @@ Return Value:
 	free(Threads);
 	free(ThreadIDs);
 
+	if (Verbose) {
+		GetSystemTime( &SystemTime );
+		SystemTimeToFileTime( &SystemTime, (PFILETIME)&EndFileTime );
+
+		ElapsedTimeIn100ns.QuadPart = EndFileTime.QuadPart - StartFileTime.QuadPart;
+
+		printf("ThreadCount = %d BufferSize = %d Elapsed Time in 100ns = %d\n", ThreadCount, BufferSize, ElapsedTimeIn100ns.QuadPart );
+	}
+
 	return ERROR_SUCCESS;
 }
 
@@ -346,6 +365,16 @@ Return Value:
 	LPHANDLE events;
 	PASYNC_JOB curr;
 
+	SYSTEMTIME SystemTime;
+	LARGE_INTEGER StartFileTime, EndFileTime;
+	LARGE_INTEGER ElapsedTimeIn100ns;
+
+	//get the starting time
+	if(Verbose){
+		GetSystemTime( &SystemTime );
+		SystemTimeToFileTime( &SystemTime, (PFILETIME)&StartFileTime );
+	}
+
 	//printf("CSE451MtCopyAsync(%d, %d, %08x, %d)\n", ThreadCount, BufferSize, SrcDst, Verbose);
 
 	for (i = 0; SrcDst[i] != NULL; i++) {
@@ -408,9 +437,10 @@ Return Value:
 	while(1){
 
 		//wait for an event to be signaled
-		FinishedIndex = WaitForMultipleObjects(ThreadCount, events, FALSE, INFINITE);
-
-		//TODO: error checking
+		if((FinishedIndex = WaitForMultipleObjects(ThreadCount, events, FALSE, INFINITE)) == WAIT_FAILED) {
+			PrintError();
+			return GetLastError();		
+		}
 
 		CloseHandle(events[FinishedIndex]);
 		
@@ -547,6 +577,15 @@ Return Value:
 	free(buffers);
 	free(aios);
 	free(events);
+
+	if (Verbose) {
+		GetSystemTime( &SystemTime );
+		SystemTimeToFileTime( &SystemTime, (PFILETIME)&EndFileTime );
+
+		ElapsedTimeIn100ns.QuadPart = EndFileTime.QuadPart - StartFileTime.QuadPart;
+
+		printf("ThreadCount = %d BufferSize = %d Elapsed Time in 100ns = %d\n", ThreadCount, BufferSize, ElapsedTimeIn100ns.QuadPart );
+	}
 
 	return ERROR_SUCCESS;
 }

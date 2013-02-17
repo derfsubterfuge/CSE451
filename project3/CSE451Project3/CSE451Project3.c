@@ -220,13 +220,9 @@ Routine Description:
 	//
 	//	Now call the copy routines to do the actual work
 	//
-
 	if (!AsyncIo) {
-
 		return CSE451MtCopy( ThreadCount, BufferSize, SrcDst, Verbose );
-
 	} else {
-
 		return CSE451MtCopyAsync( ThreadCount, BufferSize, SrcDst, Verbose );
 	}
 
