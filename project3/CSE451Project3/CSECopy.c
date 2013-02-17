@@ -565,6 +565,7 @@ Return Value:
 		if (FileIn == INVALID_HANDLE_VALUE) {
 			PrintError();
 		}
+
 		SrcDstFileData[i].src = SrcDst[i][SRC];
 		SrcDstFileData[i].dst = SrcDst[i][DST];
 		SrcDstFileData[i].index = i;
