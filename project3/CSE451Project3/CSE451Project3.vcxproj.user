@@ -6,7 +6,7 @@
     <LocalDebuggerCommand>C:\Users\xinx\Desktop\git\project3\Debug\mtcopy.exe</LocalDebuggerCommand>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
-    <LocalDebuggerCommand>C:\Users\xinx\Desktop\git\project3\Debug\mtcopy.exe</LocalDebuggerCommand>
+    <LocalDebuggerCommand>C:\Users\xinx\Desktop\git\project3\release\mtcopy.exe</LocalDebuggerCommand>
     <DebuggerFlavor>WindowsLocalDebugger</DebuggerFlavor>
     <LocalDebuggerCommandArguments>/t:4 /b:4096 /a /v C:\Users\xinx\Desktop\git\project3\TestFilesSrc\huckfinn.txt C:\Users\xinx\Desktop\git\project3\TestFilesDst</LocalDebuggerCommandArguments>
   </PropertyGroup>

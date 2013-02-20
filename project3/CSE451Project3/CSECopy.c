@@ -85,8 +85,6 @@ DWORD WINAPI ThreadCopy(
 				PrintError();
 				return GetLastError();
 			}
-				//TODO: check for error
-			//PrintError();
 		}
 
 		// if we need to change out files for this job
@@ -109,13 +107,11 @@ DWORD WINAPI ThreadCopy(
 				PrintError();
 				return GetLastError();
 			}
-			 //TODO: check for error
-			//PrintError();
 		}
 
 		// Set the file pointers
-		SetFilePointer(FileIn, /*TODO: convert to LONG from ULONG*/ (LONG)cThreadData->Chunks[i].start, NULL, FILE_BEGIN);
-		SetFilePointer(FileOut, /*TODO: convert to LONG from ULONG*/ (LONG)cThreadData->Chunks[i].start, NULL, FILE_BEGIN);
+		SetFilePointer(FileIn, (LONG)cThreadData->Chunks[i].start, NULL, FILE_BEGIN);
+		SetFilePointer(FileOut, (LONG)cThreadData->Chunks[i].start, NULL, FILE_BEGIN);
 		
 		// read the chunk
 		BytesRead = 0;
@@ -124,7 +120,6 @@ DWORD WINAPI ThreadCopy(
 				PrintError();
 				return GetLastError();
 			}
-			//TODO: check for error
 			BytesRead += Temp;
 		}
 		
@@ -135,20 +130,10 @@ DWORD WINAPI ThreadCopy(
 				PrintError();
 				return GetLastError();
 			}
-			//TODO: check for error
 			BytesWrite += Temp;
 		}
-		
-		/*printf("Chunk %d\n", i);
-		printf("\tSrcName: %S\n", cThreadData->Chunks[i].src);
-		printf("\tSrcName: %S\n", FileInName);
-		printf("\tDstName: %S\n", cThreadData->Chunks[i].dst);
-		printf("\tDstName: %S\n", FileOutName);
-		printf("\tStart: %d\n", cThreadData->Chunks[i].start);
-		printf("\tLength: %d\n", cThreadData->Chunks[i].length);*/
 	}
 	
-
 	// cleanup
 	if(FileIn != NULL)
 		CloseHandle(FileIn);
@@ -222,31 +207,10 @@ Return Value:
 		SystemTimeToFileTime( &SystemTime, (PFILETIME)&StartFileTime );
 	}
 
-	// printf("CSE451MtCopy(%d, %d, %08x, %d)\n", ThreadCount, BufferSize, SrcDst, Verbose);
-
-
-	/*if(BufferSize > MAX_BUFFER_SIZE)
-		BufferSize = MAX_BUFFER_SIZE;*/
-
 	// parse the file into chunks
 	if (ParseAndChunk(BufferSize, SrcDst, Verbose, &Chunks, &NumChunks, &NumBytes)) {
 		return GetLastError();
 	}
-
-	/*for (i = 0; i < NumChunks; i++) {
-		printf("Chunk %d\n", i);
-		printf("\tSrcName: %S\n", Chunks[i].src);
-		printf("\tDstName: %S\n", Chunks[i].dst);
-		printf("\tStart: %d\n", Chunks[i].start);
-		printf("\tLength: %d\n", Chunks[i].length);
-	}
-
-	for (i = 0; SrcDst[i] != NULL; i++) {
-		printf("SrcDst[%d] = %08x => %08x, %08x => \"%S\" \"%S\"\n", i, SrcDst[i], SrcDst[i][SRC], SrcDst[i][DST], SrcDst[i][SRC], SrcDst[i][DST]);
-	}*/
-
-	/*if(ThreadCount > MAX_THREADS)
-		ThreadCount = MAX_THREADS;*/
 
 	// be smart about number of threads created
 	if(ThreadCount > NumChunks)
@@ -284,7 +248,6 @@ Return Value:
 
 	// close all threads
 	for(i = 0; i < ThreadCount; i++) {
-		//printf("%d\n", ThreadIDs[i]);
 		CloseHandle(Threads[i]);
 	}
 
@@ -377,11 +340,8 @@ Return Value:
 		SystemTimeToFileTime( &SystemTime, (PFILETIME)&StartFileTime );
 	}
 
-	//printf("CSE451MtCopyAsync(%d, %d, %08x, %d)\n", ThreadCount, BufferSize, SrcDst, Verbose);
-
 	for (i = 0; SrcDst[i] != NULL; i++) {
 		NumFiles++;
-		//printf("SrcDst[%d] = %08x => %08x, %08x => \"%S\" \"%S\"\n", i, SrcDst[i], SrcDst[i][0], SrcDst[i][1], SrcDst[i][SRC], SrcDst[i][DST]);
 	}
 
 	//parse the files into chunks
@@ -651,8 +611,6 @@ Return Value:
 
 	ChunkSize = BufferSize;
 
-	//TODO: check for duplicate destination files
-
 	// See how many files there are
 	for (i = 0, NumFiles = 0; SrcDst[i] != NULL; i++) {
 		NumFiles++;
@@ -669,7 +627,6 @@ Return Value:
 	*NumBytes = 0;
 	*NumChunks = 0;
 	for (i = 0; SrcDst[i] != NULL; i++) {
-		//TODO: handle doesn't exist
 		FileIn = CreateFile(SrcDst[i][SRC], GENERIC_READ, FILE_SHARE_READ, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
 		if (FileIn == INVALID_HANDLE_VALUE) {
 			PrintError();
@@ -687,8 +644,6 @@ Return Value:
 		CloseHandle(FileIn);
 
 		//create destination files
-		//TODO: always overwrite?
-		//TODO: handle bad file path
 		FileOut = CreateFile(SrcDst[i][DST], GENERIC_WRITE, FILE_SHARE_WRITE, NULL, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL);
 		if (FileOut == INVALID_HANDLE_VALUE) {
 			PrintError();
