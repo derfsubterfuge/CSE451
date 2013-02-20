@@ -266,7 +266,7 @@ Return Value:
 		printf("ThreadCount = %d BufferSize = %d Elapsed Time in 100ns = %lld Throughput = %.2f MB/s \n", ThreadCount, BufferSize, ElapsedTimeIn100ns.QuadPart, (NumBytes * 10.0) / ElapsedTimeIn100ns.QuadPart);
 	}
 
-	return ERROR_SUCCESS;
+	return GetLastError();
 }
 
 
@@ -549,7 +549,7 @@ Return Value:
 		printf("ThreadCount = %d BufferSize = %d Elapsed Time in 100ns = %lld Throughput = %.2f MB/s \n", ThreadCount, BufferSize, ElapsedTimeIn100ns.QuadPart, (NumBytes * 10.0) / ElapsedTimeIn100ns.QuadPart);
 	}
 
-	return ERROR_SUCCESS;
+	return GetLastError();
 }
 
 
@@ -691,7 +691,7 @@ Return Value:
 	}
 	
 	free(SrcDstFileData);
-	return ERROR_SUCCESS;
+	return GetLastError();
 }
 
 
