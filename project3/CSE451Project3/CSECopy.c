@@ -18,12 +18,6 @@ Abstract:
 #define SRC 0
 #define DST 1
 
-//max number of threads is 8
-#define MAX_THREADS 8
-
-//max buffer size is 16MB
-#define MAX_BUFFER_SIZE (16*1024*1024)
-
 // Declaration of printError()
 VOID PrintError();
 
@@ -33,8 +27,8 @@ typedef struct _COPY_THREAD_DATA {
 	ULONG NumChunks;
 	HANDLE Mutex;
 	ULONG BufferSize;
+	ULONG Error;
 } COPY_THREAD_DATA, * PCOPY_THREAD_DATA;
-
 
 DWORD WINAPI ThreadCopy(
 	LPVOID threadData
@@ -62,7 +56,7 @@ DWORD WINAPI ThreadCopy(
 		ReleaseMutex(cThreadData->Mutex);
 		
 		// if out of chunks then break
-		if(i >= cThreadData->NumChunks)
+		if(i >= cThreadData->NumChunks || cThreadData->Error)
 			break;
 
 		// if we need to change in files for this job
@@ -83,6 +77,7 @@ DWORD WINAPI ThreadCopy(
 				NULL);
 			if (FileIn == INVALID_HANDLE_VALUE) {
 				PrintError();
+				cThreadData->Error = GetLastError();
 				return GetLastError();
 			}
 		}
@@ -105,6 +100,7 @@ DWORD WINAPI ThreadCopy(
 				NULL);
 			if (FileOut == INVALID_HANDLE_VALUE) {
 				PrintError();
+				cThreadData->Error = GetLastError();
 				return GetLastError();
 			}
 		}
@@ -118,6 +114,7 @@ DWORD WINAPI ThreadCopy(
 		while(BytesRead < cThreadData->Chunks[i].length) {
 			if	(ReadFile(FileIn, Buffer+BytesRead, cThreadData->Chunks[i].length-BytesRead, &Temp, NULL) == FALSE) {
 				PrintError();
+				cThreadData->Error = GetLastError();
 				return GetLastError();
 			}
 			BytesRead += Temp;
@@ -128,6 +125,7 @@ DWORD WINAPI ThreadCopy(
 		while(BytesWrite < cThreadData->Chunks[i].length) {
 			if (WriteFile(FileOut, Buffer+BytesWrite, cThreadData->Chunks[i].length-BytesWrite, &Temp, NULL) == FALSE) {
 				PrintError();
+				cThreadData->Error = GetLastError();
 				return GetLastError();
 			}
 			BytesWrite += Temp;
@@ -196,6 +194,7 @@ Return Value:
 	PHANDLE Threads;
 	PULONG ThreadIDs;
 	HANDLE Mutex;
+	ULONG Error;
 
 	SYSTEMTIME SystemTime;
 	LARGE_INTEGER StartFileTime, EndFileTime;
@@ -225,6 +224,7 @@ Return Value:
 	ThreadData->Mutex = CreateMutex(NULL,FALSE,NULL);
 	ThreadData->Chunks = Chunks;
 	ThreadData->NextChunk = 0;
+	ThreadData->Error = ERROR_SUCCESS;
 	ThreadData->BufferSize = BufferSize;
 	ThreadData->NumChunks = NumChunks;
 
@@ -251,6 +251,7 @@ Return Value:
 		CloseHandle(Threads[i]);
 	}
 
+	Error = ThreadData->Error;
 	// cleanup
 	free(Chunks);
 	free(ThreadData);
@@ -266,7 +267,7 @@ Return Value:
 		printf("ThreadCount = %d BufferSize = %d Elapsed Time in 100ns = %lld Throughput = %.2f MB/s \n", ThreadCount, BufferSize, ElapsedTimeIn100ns.QuadPart, (NumBytes * 10.0) / ElapsedTimeIn100ns.QuadPart);
 	}
 
-	return GetLastError();
+	return Error;
 }
 
 
@@ -549,7 +550,7 @@ Return Value:
 		printf("ThreadCount = %d BufferSize = %d Elapsed Time in 100ns = %lld Throughput = %.2f MB/s \n", ThreadCount, BufferSize, ElapsedTimeIn100ns.QuadPart, (NumBytes * 10.0) / ElapsedTimeIn100ns.QuadPart);
 	}
 
-	return GetLastError();
+	return ERROR_SUCCESS;
 }
 
 
@@ -691,7 +692,7 @@ Return Value:
 	}
 	
 	free(SrcDstFileData);
-	return GetLastError();
+	return ERROR_SUCCESS;
 }
 
 
