@@ -3359,3 +3359,244 @@ FatSortDirectory (
     return;
 }
 
+VOID 
+FatPrintDirents(
+	PIRP_CONTEXT IrpContext,
+	PDCB Dcb)
+{
+	VBO Pos = 0;
+	PBCB Bcb = NULL;
+	PDIRENT Dirent;
+	NTSTATUS Status;
+	
+	DbgPrint("DIR\tOFFSET\n");
+	while(TRUE) {
+		FatReadDirent(IrpContext,
+						Dcb,
+						Pos,
+						&Bcb,
+						&Dirent,
+						&Status);
+						
+		if(Status == STATUS_END_OF_FILE) {
+			//if we have reached the end... move on
+			FatUnpinBcb(IrpContext, Bcb);
+			break;
+		} else if(Status != STATUS_SUCCESS) {
+			FatUnpinBcb(IrpContext, Bcb);
+			DbgPrint("ERROR");
+			//if error, repeat
+			continue; //TODO
+		} else if(Dirent->FileName[0] == FAT_DIRENT_NEVER_USED) {
+			//if we found the first deleted entry or an unused entry... move on
+			FatUnpinBcb(IrpContext, Bcb);
+			break;
+		}
+
+		if(Dirent->FileName[0] != FAT_DIRENT_DELETED) {
+			DbgPrint("%.11s\t%d\n",Dirent->FileName, Pos);
+		}
+		
+		//try next entry
+		Dirent += 1;
+		Pos += sizeof(DIRENT);	
+	}
+	
+	DbgPrint("\n");
+}
+
+VOID
+FatPrintChildrenFcbDcb(
+	PIRP_CONTEXT IrpContext,
+	PDCB Dcb)
+{
+	PFCB Fcb;
+	ULONG i;
+	
+	DbgPrint("Name\tLFN\tDirOff\n");
+	Fcb = FatGetFirstChild(Dcb);
+	while(Fcb != NULL) { //TODO: fix for long file names
+		DbgPrint("%Z\t%d\t%d\n", &Fcb->FullFileName, Fcb->LfnOffsetWithinDirectory, Fcb->DirentOffsetWithinDirectory);
+		Fcb = FatGetNextSibling(Fcb);
+	}
+	
+}
+
+VOID
+FatCompactDirents(
+	PIRP_CONTEXT IrpContext, 
+	PDCB Dcb)
+{
+	VBO VboShift;
+
+	PDIRENT MoveTo;
+	VBO MoveToPos = 0;
+	NTSTATUS StatusTo;
+	PBCB BcbTo = NULL;
+	
+	PDIRENT MoveFrom;
+	VBO MoveFromPos = 0;
+	NTSTATUS StatusFrom;
+	PBCB BcbFrom = NULL;
+	
+	PFCB Fcb;
+	
+	ExAcquireResourceExclusiveLite(Dcb->Header.Resource, TRUE);
+	ExAcquireResourceExclusiveLite(Dcb->Header.PagingIoResource, TRUE);
+	
+	FatRescanDirectory(IrpContext, Dcb); //TODO: use deleted hint instead of scanning through for first deleted item
+	
+	//find first deleted, end of file, or never used entry
+	while(TRUE) {
+		FatReadDirent(IrpContext,
+						Dcb,
+						MoveToPos,
+						&BcbTo,
+						&MoveTo,
+						&StatusTo);
+						
+		if(StatusTo == STATUS_END_OF_FILE) {
+			//if we have reached the end... move on
+			FatUnpinBcb(IrpContext, BcbTo);
+			break;
+		} else if(StatusTo != STATUS_SUCCESS) {
+			FatUnpinBcb(IrpContext, BcbTo);
+			//if error, repeat
+			continue; //TODO
+		} else if(MoveTo->FileName[0] == FAT_DIRENT_DELETED ||
+					MoveTo->FileName[0] == FAT_DIRENT_NEVER_USED) {
+			//if we found the first deleted entry or an unused entry... move on
+			FatUnpinBcb(IrpContext, BcbTo);
+			break;
+		}
+
+		//try next entry
+		MoveToPos += sizeof(DIRENT);	
+		MoveTo++;
+	}
+
+	//if we didn't reach the end before finding a deleted entry
+	//then compact
+	if(StatusTo != STATUS_END_OF_FILE &&
+		MoveTo->FileName[0] != FAT_DIRENT_NEVER_USED) {
+		
+		//set the from position to the position past the to position
+		MoveFromPos = MoveToPos + sizeof(DIRENT);
+		MoveFrom = MoveTo+1;
+		//
+		while(TRUE) {
+			while(TRUE) {
+				FatReadDirent(IrpContext,
+								Dcb,
+								MoveToPos,
+								&BcbTo,
+								&MoveTo,
+								&StatusTo);
+				
+				if(StatusTo != STATUS_SUCCESS) { //STATUS_END_OF_FILE is impossible
+					FatUnpinBcb(IrpContext, BcbTo);
+					continue;
+				} else {
+					break;
+				}
+			}
+			
+			while(TRUE) {
+				FatReadDirent(IrpContext,
+								Dcb,
+								MoveFromPos,
+								&BcbFrom,
+								&MoveFrom,
+								&StatusFrom);
+				
+				
+				if(StatusFrom != STATUS_SUCCESS &&
+					StatusFrom != STATUS_END_OF_FILE) {
+					//if error, repeat
+					FatUnpinBcb(IrpContext, BcbFrom);
+					continue; //TODO
+				} else if(StatusFrom == STATUS_END_OF_FILE ||
+					MoveFrom->FileName[0] != FAT_DIRENT_DELETED ||
+					MoveFrom->FileName[0] == FAT_DIRENT_NEVER_USED) {
+					
+					//if we reach the end of the file or an entry
+					//that isn't deleted than exit
+					break;
+				}
+				
+				//try the next entry
+				MoveFromPos += sizeof(DIRENT);
+				MoveFrom++;
+			}
+			
+			if(StatusFrom == STATUS_END_OF_FILE ||
+				MoveFrom->FileName[0] == FAT_DIRENT_NEVER_USED) {
+				//if we are the at the end then mark everything from To
+				//to the end as deleted
+				
+				FatUnpinBcb(IrpContext, BcbTo);
+				FatUnpinBcb(IrpContext, BcbFrom);
+				break;
+			} else {
+				
+				FatUnpinBcb(IrpContext, BcbTo);
+				FatUnpinBcb(IrpContext, BcbFrom);
+				
+				FatPrepareWriteDirectoryFile(IrpContext,
+											  Dcb,
+                                              MoveToPos,
+                                              sizeof(DIRENT),
+                                              &BcbTo,
+                                              (PVOID *)&MoveTo,
+                                              FALSE,
+                                              TRUE,
+                                              &StatusTo );
+				
+				FatPrepareWriteDirectoryFile(IrpContext,
+											  Dcb,
+                                              MoveFromPos,
+                                              sizeof(DIRENT),
+                                              &BcbFrom,
+                                              (PVOID *)&MoveFrom,
+                                              FALSE,
+                                              TRUE,
+                                              &StatusFrom );
+				
+				
+				RtlMoveMemory(MoveTo, MoveFrom, sizeof(DIRENT));
+				MoveFrom->FileName[0] = FAT_DIRENT_DELETED;
+								 
+				Fcb = FatGetFirstChild(Dcb);
+				while(Fcb != NULL) { //TODO: fix for long file names
+					if(Fcb->DirentOffsetWithinDirectory == MoveFromPos) {
+						VboShift = Fcb->DirentOffsetWithinDirectory - MoveToPos;
+						Fcb->DirentOffsetWithinDirectory = MoveToPos;
+						Fcb->LfnOffsetWithinDirectory -= VboShift;
+						FatResetFcb(IrpContext, Fcb);
+						break;
+					}
+					Fcb = FatGetNextSibling(Fcb);
+				}
+								 
+				//FatSetDirtyBcb( IrpContext, BcbTo, Dcb->Vcb, TRUE );
+				FatUnpinBcb(IrpContext, BcbTo);
+								  
+				//FatSetDirtyBcb( IrpContext, BcbFrom, Dcb->Vcb, TRUE );
+				FatUnpinBcb(IrpContext, BcbFrom);
+				
+				//FatFlushDirentForFile( IrpContext, Fcb );
+				
+				MoveToPos += sizeof(DIRENT);
+				MoveTo++;
+				MoveFromPos += sizeof(DIRENT);
+				MoveFrom++;
+			}
+		}
+		
+		//scan the directory to make sure that the free bitmap is set properly
+		FatRescanDirectory(IrpContext, Dcb);
+	}
+	
+	ExReleaseResourceLite(Dcb->Header.PagingIoResource);
+	ExReleaseResourceLite(Dcb->Header.Resource);
+}
