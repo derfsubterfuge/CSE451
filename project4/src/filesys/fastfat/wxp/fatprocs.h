@@ -333,6 +333,18 @@ FatPrepareWriteDirectoryFile (
     OUT PNTSTATUS Status
     );
 
+VOID 
+FatCompactDirents(PIRP_CONTEXT IrpContext, PDCB Dcb);
+
+VOID 
+FatPrintChildrenFcbDcb(PIRP_CONTEXT IrpContext, PDCB Dcb);
+
+VOID 
+FatPrintDirents(PIRP_CONTEXT IrpContext, PDCB Dcb);
+
+VOID 
+FatResetFcb(PIRP_CONTEXT IrpContext, PFCB Fcb);
+
 VOID
 FatOpenDirectoryFile (
     IN PIRP_CONTEXT IrpContext,

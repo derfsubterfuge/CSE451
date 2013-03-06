@@ -308,7 +308,7 @@ Return Value:
     }
 
     if (TopLevel) { IoSetTopLevelIrp( NULL ); }
-
+		
     FsRtlExitFileSystem();
 
     //
@@ -1667,6 +1667,15 @@ Return Value:
                                  NoEaKnowledge,
                                  DeleteOnClose,
                                  TemporaryFile );
+		// FatPrintDirents(IrpContext, ParentDcb);
+		// DbgPrint("\n");
+		// FatPrintChildrenFcbDcb(IrpContext, ParentDcb);
+		
+		FatCompactDirents( IrpContext, ParentDcb );
+		
+		 FatPrintDirents(IrpContext, ParentDcb);
+		// DbgPrint("\n");
+		// FatPrintChildrenFcbDcb(IrpContext, ParentDcb);
 
         //
         //  Check if we need to set the cache support flag in
