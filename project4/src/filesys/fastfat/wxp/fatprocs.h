@@ -540,6 +540,69 @@ FatPerformDevIoCtrl (
 //  Tunneling is a deletion precursor (all tunneling cases do
 //  not involve deleting dirents, however)
 //
+typedef enum _TYPE_OF_SORT {
+
+    SORTBYNAME = 1,
+    SORTBYEXT,
+    SORTBYSIZE,
+    SORTBYTIME,
+    SORTBYFAT,
+    NOSORT
+
+} TYPE_OF_SORT;
+
+TYPE_OF_SORT
+FatTypeOfSort (
+    IN PVCB Vcb
+    );
+
+LONG
+FatNameCompare(
+    IN PIRP_CONTEXT IrpContext,
+    IN PDIRENT d1,
+    IN PDIRENT d2
+    );
+    
+LONG
+FatExtCompare(
+    IN PIRP_CONTEXT IrpContext,
+    IN PDIRENT d1,
+    IN PDIRENT d2
+    );
+    
+LONG
+FatSizeCompare(
+    IN PIRP_CONTEXT IrpContext,
+    IN PDIRENT d1,
+    IN PDIRENT d2
+    );
+    
+LONG
+FatTimeCompare(
+    IN PIRP_CONTEXT IrpContext,
+    IN PDIRENT d1,
+    IN PDIRENT d2
+    );
+    
+LONG
+FatFatCompare(
+    IN PIRP_CONTEXT IrpContext,
+    IN PDIRENT d1,
+    IN PDIRENT d2
+    );
+    
+VOID
+FatSort (
+    IN PIRP_CONTEXT IrpContext,
+    IN PDCB Dcb,
+    IN LONG(*compare)(PIRP_CONTEXT, PDIRENT, PDIRENT)
+    );
+    
+VOID
+FatSortDirectory (
+    IN PIRP_CONTEXT IrpContext,
+    IN PDCB Dcb
+    );
 
 VOID
 FatTunnelFcbOrDcb (

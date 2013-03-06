@@ -1233,7 +1233,8 @@ Return Value:
         }
 
         Status = STATUS_SUCCESS;
-
+        
+        FatSortDirectory(IrpContext, Vcb->RootDcb);
     try_exit: NOTHING;
     } finally {
 

@@ -3104,3 +3104,258 @@ Return Value:
     return;
 }
 
+
+TYPE_OF_SORT
+FatTypeOfSort (
+    PVCB Vcb
+    )
+{
+    TYPE_OF_SORT SortType;
+    UNICODE_STRING SortByName;
+    UNICODE_STRING SortByExt;
+    UNICODE_STRING SortBySize;
+    UNICODE_STRING SortByTime;
+    UNICODE_STRING SortByFat;
+    
+    // Get the VolumeLabel Unicode String
+    UNICODE_STRING VolumeLabel = {  Vcb->Vpb->VolumeLabelLength,
+                                    MAXIMUM_VOLUME_LABEL_LENGTH,
+                                    Vcb->Vpb->VolumeLabel };
+    
+    // Initialize comparison unicode strings
+    RtlInitUnicodeString(   &SortByName,
+                            L"SORTBYNAME"   );
+    RtlInitUnicodeString(   &SortByExt,
+                            L"SORTBYEXT"   );
+    RtlInitUnicodeString(   &SortBySize,
+                            L"SORTBYSIZE"   );
+    RtlInitUnicodeString(   &SortByTime,
+                            L"SORTBYTIME"   );
+    RtlInitUnicodeString(   &SortByFat,
+                            L"SORTBYFAT"   );
+                            
+    // compare against our sort labels setting SortType
+    if (RtlEqualUnicodeString(&SortByName, &VolumeLabel, FALSE)) {
+        SortType = SORTBYNAME;
+    } else if (RtlEqualUnicodeString(&SortByExt, &VolumeLabel, FALSE)) {
+        SortType = SORTBYEXT;
+    } else if (RtlEqualUnicodeString(&SortBySize, &VolumeLabel, FALSE)) {
+        SortType = SORTBYSIZE;
+    } else if (RtlEqualUnicodeString(&SortByTime, &VolumeLabel, FALSE)) {
+        SortType = SORTBYTIME;
+    } else if (RtlEqualUnicodeString(&SortByFat, &VolumeLabel, FALSE)) {
+        SortType = SORTBYFAT;
+    } else {
+        SortType = NOSORT;
+    }
+    
+    return SortType;
+
+}
+
+LONG
+FatNameCompare(
+    PIRP_CONTEXT IrpContext,
+    PDIRENT d1,
+    PDIRENT d2
+    )
+{
+    // only for FAT8DOT3 names for now
+    return strncmp( &(d1->FileName[0]),
+                    &(d2->FileName[0]),
+                    8);
+}
+
+LONG
+FatExtCompare(
+    PIRP_CONTEXT IrpContext,
+    PDIRENT d1,
+    PDIRENT d2
+    )
+{
+    return strncmp( &(d1->FileName[8]),
+                    &(d2->FileName[8]),
+                    3);
+}
+
+LONG
+FatSizeCompare(
+    PIRP_CONTEXT IrpContext,
+    PDIRENT d1,
+    PDIRENT d2
+    )
+{
+    if (d1->FileSize == d2->FileSize)
+        return 0;
+    return d1->FileSize > d2->FileSize ? 1 : -1;
+}
+
+LONG
+FatTimeCompare(
+    PIRP_CONTEXT IrpContext,
+    PDIRENT d1,
+    PDIRENT d2
+    )
+{
+    LONG ret;
+
+    if (d1->CreationTime.Date.Year > d2->CreationTime.Date.Year) {
+        ret = 1;
+    } else if(d1->CreationTime.Date.Year < d2->CreationTime.Date.Year) {
+        ret = -1;
+    } else {
+        if (d1->CreationTime.Date.Month > d2->CreationTime.Date.Month) {
+            ret = 1;
+        } else if(d1->CreationTime.Date.Month < d2->CreationTime.Date.Month) {
+            ret = -1;
+        } else {
+            if (d1->CreationTime.Date.Day > d2->CreationTime.Date.Day) {
+                ret = 1;
+            } else if(d1->CreationTime.Date.Day < d2->CreationTime.Date.Day) {
+                ret = -1;
+            } else {
+                if (d1->CreationTime.Time.Hour > d2->CreationTime.Time.Hour) {
+                    ret = 1;
+                } else if(d1->CreationTime.Time.Hour < d2->CreationTime.Time.Hour) {
+                    ret = -1;
+                } else {
+                    if (d1->CreationTime.Time.Minute > d2->CreationTime.Time.Minute) {
+                        ret = 1;
+                    } else if(d1->CreationTime.Time.Minute < d2->CreationTime.Time.Minute) {
+                        ret = -1;
+                    } else {
+                        if (d1->CreationTime.Time.DoubleSeconds > d2->CreationTime.Time.DoubleSeconds) {
+                            ret = 1;
+                        } else if(d1->CreationTime.Time.DoubleSeconds < d2->CreationTime.Time.DoubleSeconds) {
+                            ret = -1;
+                        } else {
+                            ret = 0;
+                        }
+                    }
+                }
+            }
+        }
+    }
+    
+    return ret;
+}
+
+LONG
+FatFatCompare(
+    PIRP_CONTEXT IrpContext,
+    PDIRENT d1,
+    PDIRENT d2
+    )
+{
+    if (d1->FirstClusterOfFile == d2->FirstClusterOfFile)
+        return 0;
+    return d1->FirstClusterOfFile > d2->FirstClusterOfFile ? 1 : -1;
+}
+
+VOID
+FatSort (
+    PIRP_CONTEXT IrpContext,
+    PDCB Dcb,
+    LONG(*compare)(PIRP_CONTEXT, PDIRENT, PDIRENT)
+    )
+{
+    // sort routine on the dirents using
+    // the provided compare function
+    
+    // this does not sort
+    //      only step through the dirents and compare them
+    VBO Pos = 32;
+	PBCB Bcb = NULL;
+	PDIRENT DirentFront;
+    PDIRENT DirentBack;
+	NTSTATUS Status;
+	
+	DbgPrint("DIRBack\tDIRFront\tOFFSET\tCOMPARE\n");
+    try {
+        while(TRUE) {
+            FatReadDirent(IrpContext,
+                            Dcb,
+                            Pos,
+                            &Bcb,
+                            &DirentFront,
+                            &Status);
+            DirentBack = DirentFront - 1;
+                            
+            if(Status == STATUS_END_OF_FILE) {
+                //if we have reached the end... move on
+                break;
+            } else if(Status != STATUS_SUCCESS) {
+                DbgPrint("ERROR");
+                //if error, repeat
+                continue; //TODO
+            } else if(DirentFront->FileName[0] == FAT_DIRENT_NEVER_USED) {
+                //if we found the first deleted entry or an unused entry... move on
+                break;
+            }
+
+            if((DirentFront->FileName[0] != FAT_DIRENT_DELETED)
+                && (DirentBack->FileName[0] != FAT_DIRENT_DELETED)) {
+                DbgPrint("%.11s\t%.11s\t%d\t%d\n",
+                            DirentBack->FileName,
+                            DirentFront->FileName,
+                            Pos,
+                            compare(IrpContext, DirentBack, DirentFront));
+            }
+            
+            //try next entry
+            DirentBack += 1;
+            DirentFront += 1;
+            Pos += sizeof(DIRENT);	
+        }
+        
+        DbgPrint("\n");
+        
+    } finally {
+        FatUnpinBcb(IrpContext, Bcb);
+    }
+    return;
+}
+
+VOID
+FatSortDirectory (
+    PIRP_CONTEXT IrpContext,
+    PDCB Dcb
+    )
+{
+    PBCB Bcb = NULL;
+    PDIRENT Dirent;
+    NTSTATUS Status;
+    
+    TYPE_OF_SORT SortType;
+    
+    SortType = FatTypeOfSort(Dcb->Vcb);
+    
+    switch (SortType) {
+        case SORTBYNAME:
+            DbgPrint("SORTBYNAME\n");
+            FatSort(IrpContext, Dcb, &FatNameCompare);
+            break;
+        case SORTBYEXT:
+            DbgPrint("SORTBYEXT\n");
+            FatSort(IrpContext, Dcb, &FatExtCompare);
+            break;
+        case SORTBYSIZE:
+            DbgPrint("SORTBYSIZE\n");
+            FatSort(IrpContext, Dcb, &FatSizeCompare);
+            break;
+        case SORTBYTIME:
+            DbgPrint("SORTBYTIME\n");
+            FatSort(IrpContext, Dcb, &FatTimeCompare);
+            break;
+        case SORTBYFAT:
+            DbgPrint("SORTBYFAT\n");
+            FatSort(IrpContext, Dcb, &FatFatCompare);
+            break;
+        case NOSORT:
+        default:
+            DbgPrint("NOSORT\n");
+            break;
+    }
+    return;
+}
+
